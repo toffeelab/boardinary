@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "nest start --watch",
+    "dev": "dotenv -e .env -- nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
     "lint": "eslint --max-warnings 0",
@@ -32,6 +32,7 @@
     "@swc/core": "^1.11.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.15.3",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.1",
     "tsx": "^4.19.4",
     "typescript": "5.9.2"
