@@ -1,50 +1,73 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #0c0a1a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0c0a1a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0c0a1a;
+  --color-primary: #8b5cf6;
+  --color-primary-foreground: #faf5ff;
+  --color-secondary: #f3e8ff;
+  --color-secondary-foreground: #2e1065;
+  --color-muted: #f5f3ff;
+  --color-muted-foreground: #6b7280;
+  --color-accent: #f3e8ff;
+  --color-accent-foreground: #2e1065;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e9d5ff;
+  --color-input: #e9d5ff;
+  --color-ring: #8b5cf6;
+  --color-sidebar-background: #faf5ff;
+  --color-sidebar-foreground: #0c0a1a;
+  --color-sidebar-primary: #8b5cf6;
+  --color-sidebar-primary-foreground: #faf5ff;
+  --color-sidebar-accent: #f3e8ff;
+  --color-sidebar-accent-foreground: #2e1065;
+  --color-sidebar-border: #e9d5ff;
+  --radius: 0.625rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  .dark {
+    --color-background: #0c0a1a;
+    --color-foreground: #e2e8f0;
+    --color-card: #1e1b3a;
+    --color-card-foreground: #e2e8f0;
+    --color-popover: #1e1b3a;
+    --color-popover-foreground: #e2e8f0;
+    --color-primary: #a78bfa;
+    --color-primary-foreground: #0c0a1a;
+    --color-secondary: #2e2854;
+    --color-secondary-foreground: #e2e8f0;
+    --color-muted: #1e1b3a;
+    --color-muted-foreground: #a1a1c7;
+    --color-accent: #2e2854;
+    --color-accent-foreground: #e2e8f0;
+    --color-destructive: #f87171;
+    --color-destructive-foreground: #0c0a1a;
+    --color-border: #2e2854;
+    --color-input: #2e2854;
+    --color-ring: #a78bfa;
+    --color-sidebar-background: #0c0a1a;
+    --color-sidebar-foreground: #e2e8f0;
+    --color-sidebar-primary: #a78bfa;
+    --color-sidebar-primary-foreground: #0c0a1a;
+    --color-sidebar-accent: #2e2854;
+    --color-sidebar-accent-foreground: #e2e8f0;
+    --color-sidebar-border: #2e2854;
   }
 }
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.imgDark {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+@layer base {
+  * {
+    @apply border-border;
   }
-
-  .imgLight {
-    display: none;
-  }
-  .imgDark {
-    display: unset;
+  body {
+    @apply bg-background text-foreground;
   }
 }
