@@ -1,0 +1,59 @@
+name: Cleanup merged feature branches
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # 매주 일요일 03:00 UTC
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete old merged feature branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RETENTION_DAYS: 90
+        run: |
+          cutoff=$(date -d "${RETENTION_DAYS} days ago" +%Y-%m-%d)
+          echo "Cutoff date: $cutoff (branches created before this will be deleted)"
+          echo ""
+
+          deleted=0
+          skipped=0
+
+          gh api repos/${{ github.repository }}/branches --paginate -q '.[].name' \
+            | grep '^feature/' \
+            | while read branch; do
+                # 브랜치명에서 날짜 추출 (feature/YYYY-MM-DD/name 형식)
+                date_part=$(echo "$branch" | sed -n 's|^feature/\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\)/.*|\1|p')
+
+                if [ -z "$date_part" ]; then
+                  echo "SKIP: $branch (날짜 형식 아님)"
+                  continue
+                fi
+
+                if [ "$date_part" \> "$cutoff" ] || [ "$date_part" = "$cutoff" ]; then
+                  echo "SKIP: $branch (${date_part} - 보관 기간 내)"
+                  skipped=$((skipped + 1))
+                  continue
+                fi
+
+                # develop에 머지되었는지 확인
+                if git branch -r --merged origin/develop | grep -q "origin/${branch}$"; then
+                  echo "DELETE: $branch (${date_part} - 머지 완료, 보관 기간 초과)"
+                  git push origin --delete "$branch"
+                  deleted=$((deleted + 1))
+                else
+                  echo "SKIP: $branch (${date_part} - 미머지)"
+                  skipped=$((skipped + 1))
+                fi
+              done
+
+          echo ""
+          echo "Done. Deleted: $deleted, Skipped: $skipped"
