@@ -8,9 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentUserId } from "@/lib/auth";
-import { getOrganizationBySlug, isOrgMember } from "@/data-access/organizations";
-import { getProjectBySlug } from "@/data-access/projects";
-import { getStoryboardById } from "@/data-access/storyboards";
+import { apiClient } from "@/lib/api-client";
+import type { StoryboardDto } from "@repo/types";
 
 export default async function StoryboardDetailPage({
   params,
@@ -20,17 +19,15 @@ export default async function StoryboardDetailPage({
   const { orgSlug, slug, id } = await params;
   const userId = await getCurrentUserId();
 
-  const org = await getOrganizationBySlug(orgSlug);
-  if (!org) notFound();
-
-  const isMember = await isOrgMember(org.id, userId);
-  if (!isMember) notFound();
-
-  const project = await getProjectBySlug(org.id, slug);
-  if (!project) notFound();
-
-  const storyboard = await getStoryboardById(id);
-  if (!storyboard || storyboard.projectId !== project.id) notFound();
+  let storyboard: StoryboardDto;
+  try {
+    storyboard = await apiClient<StoryboardDto>(
+      `/api/storyboards/${id}`,
+      { userId },
+    );
+  } catch {
+    notFound();
+  }
 
   return (
     <div>

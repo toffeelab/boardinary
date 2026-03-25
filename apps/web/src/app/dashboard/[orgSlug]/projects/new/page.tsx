@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,8 +9,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getCurrentUserId } from "@/lib/auth";
-import { getOrganizationBySlug, isOrgMember } from "@/data-access/organizations";
 import { createProjectAction } from "@/actions/project-actions";
 
 export default async function NewProjectPage({
@@ -20,13 +17,6 @@ export default async function NewProjectPage({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  const userId = await getCurrentUserId();
-
-  const org = await getOrganizationBySlug(orgSlug);
-  if (!org) notFound();
-
-  const isMember = await isOrgMember(org.id, userId);
-  if (!isMember) notFound();
 
   return (
     <div className="mx-auto max-w-lg">
@@ -38,7 +28,14 @@ export default async function NewProjectPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={createProjectAction as unknown as (formData: FormData) => void} className="space-y-4">
+          <form
+            action={
+              createProjectAction as unknown as (
+                formData: FormData,
+              ) => void
+            }
+            className="space-y-4"
+          >
             <input type="hidden" name="orgSlug" value={orgSlug} />
             <div className="space-y-2">
               <Label htmlFor="name">프로젝트 이름</Label>

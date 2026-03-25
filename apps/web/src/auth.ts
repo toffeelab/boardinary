@@ -1,17 +1,17 @@
 import NextAuth, { type NextAuthResult } from "next-auth";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import Resend from "next-auth/providers/resend";
-import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
 import {
+  db,
   users,
   accounts,
   sessions,
   verificationTokens,
-  organizations,
-  orgMembers,
-} from "@/db/schema";
+} from "@repo/db/auth";
 import authConfig from "./auth.config";
+
+const API_URL = process.env.API_URL ?? "http://localhost:4001";
+const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET ?? "";
 
 const nextAuth = NextAuth({
   adapter: DrizzleAdapter(db, {
@@ -45,44 +45,21 @@ const nextAuth = NextAuth({
   events: {
     async createUser({ user }) {
       if (!user.id) return;
-      const slug =
-        user.name?.toLowerCase().replace(/\s+/g, "-") ??
-        `user-${user.id.slice(0, 8)}`;
       try {
-        await db.transaction(async (tx) => {
-          let [org] = await tx
-            .insert(organizations)
-            .values({
-              name: `${user.name ?? "내"}의 워크스페이스`,
-              slug: `${slug}-${user.id!.slice(0, 6)}`,
-              ownerId: user.id!,
-              isPersonal: true,
-            })
-            .onConflictDoNothing()
-            .returning();
-
-          if (!org) {
-            [org] = await tx
-              .select()
-              .from(organizations)
-              .where(
-                and(
-                  eq(organizations.ownerId, user.id!),
-                  eq(organizations.isPersonal, true),
-                ),
-              )
-              .limit(1);
-          }
-
-          if (org) {
-            await tx
-              .insert(orgMembers)
-              .values({ orgId: org.id, userId: user.id!, role: "owner" })
-              .onConflictDoNothing();
-          }
+        await fetch(`${API_URL}/api/users/setup`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Internal-Secret": INTERNAL_SECRET,
+            "X-User-Id": user.id,
+          },
+          body: JSON.stringify({
+            userId: user.id,
+            name: user.name ?? null,
+          }),
         });
       } catch {
-        // Prevent app crash on unexpected errors
+        // Prevent app crash
       }
     },
   },

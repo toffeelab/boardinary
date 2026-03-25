@@ -10,9 +10,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentUserId } from "@/lib/auth";
-import { getOrganizationBySlug, isOrgMember } from "@/data-access/organizations";
-import { getProjectBySlug } from "@/data-access/projects";
-import { getStoryboardsByProjectId } from "@/data-access/storyboards";
+import { apiClient } from "@/lib/api-client";
+import type { ProjectDto, StoryboardMetaDto } from "@repo/types";
 import { EmptyState } from "@/components/shared/empty-state";
 
 export default async function ProjectDetailPage({
@@ -23,16 +22,20 @@ export default async function ProjectDetailPage({
   const { orgSlug, slug } = await params;
   const userId = await getCurrentUserId();
 
-  const org = await getOrganizationBySlug(orgSlug);
-  if (!org) notFound();
+  let project: ProjectDto;
+  try {
+    project = await apiClient<ProjectDto>(
+      `/api/organizations/${orgSlug}/projects/${slug}`,
+      { userId },
+    );
+  } catch {
+    notFound();
+  }
 
-  const isMember = await isOrgMember(org.id, userId);
-  if (!isMember) notFound();
-
-  const project = await getProjectBySlug(org.id, slug);
-  if (!project) notFound();
-
-  const storyboards = await getStoryboardsByProjectId(project.id);
+  const storyboards = await apiClient<StoryboardMetaDto[]>(
+    `/api/organizations/${orgSlug}/projects/${slug}/storyboards`,
+    { userId },
+  );
 
   return (
     <div>

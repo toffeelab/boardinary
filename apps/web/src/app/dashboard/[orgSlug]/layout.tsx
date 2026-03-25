@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { getCurrentUserId } from "@/lib/auth";
-import {
-  getOrganizationsByUserId,
-  getOrganizationBySlug,
-  isOrgMember,
-} from "@/data-access/organizations";
-import { getProjectsByOrgId } from "@/data-access/projects";
+import { apiClient } from "@/lib/api-client";
+import type {
+  OrganizationWithRoleDto,
+  OrganizationDto,
+  ProjectDto,
+} from "@repo/types";
 import { Sidebar } from "@/components/dashboard/sidebar";
 
 export default async function OrgLayout({
@@ -18,14 +18,24 @@ export default async function OrgLayout({
   const { orgSlug } = await params;
   const userId = await getCurrentUserId();
 
-  const org = await getOrganizationBySlug(orgSlug);
-  if (!org) notFound();
+  let org: OrganizationDto;
+  try {
+    org = await apiClient<OrganizationDto>(
+      `/api/organizations/${orgSlug}`,
+      { userId },
+    );
+  } catch {
+    notFound();
+  }
 
-  const isMember = await isOrgMember(org.id, userId);
-  if (!isMember) notFound();
-
-  const orgs = await getOrganizationsByUserId(userId);
-  const projects = await getProjectsByOrgId(org.id);
+  const orgs = await apiClient<OrganizationWithRoleDto[]>(
+    "/api/organizations",
+    { userId },
+  );
+  const projects = await apiClient<ProjectDto[]>(
+    `/api/organizations/${orgSlug}/projects`,
+    { userId },
+  );
 
   return (
     <div className="flex flex-1 overflow-hidden">

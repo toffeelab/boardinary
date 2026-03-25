@@ -11,8 +11,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getCurrentUserId } from "@/lib/auth";
-import { getOrganizationBySlug, isOrgMember } from "@/data-access/organizations";
-import { getProjectBySlug } from "@/data-access/projects";
+import { apiClient } from "@/lib/api-client";
+import type { ProjectDto } from "@repo/types";
 import { createStoryboardAction } from "@/actions/storyboard-actions";
 
 const GENRES = [
@@ -34,14 +34,15 @@ export default async function NewStoryboardPage({
   const { orgSlug, slug } = await params;
   const userId = await getCurrentUserId();
 
-  const org = await getOrganizationBySlug(orgSlug);
-  if (!org) notFound();
-
-  const isMember = await isOrgMember(org.id, userId);
-  if (!isMember) notFound();
-
-  const project = await getProjectBySlug(org.id, slug);
-  if (!project) notFound();
+  let project: ProjectDto;
+  try {
+    project = await apiClient<ProjectDto>(
+      `/api/organizations/${orgSlug}/projects/${slug}`,
+      { userId },
+    );
+  } catch {
+    notFound();
+  }
 
   return (
     <div className="mx-auto max-w-lg">
@@ -53,7 +54,14 @@ export default async function NewStoryboardPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={createStoryboardAction as unknown as (formData: FormData) => void} className="space-y-4">
+          <form
+            action={
+              createStoryboardAction as unknown as (
+                formData: FormData,
+              ) => void
+            }
+            className="space-y-4"
+          >
             <input type="hidden" name="orgSlug" value={orgSlug} />
             <input type="hidden" name="projectSlug" value={slug} />
 
@@ -97,7 +105,9 @@ export default async function NewStoryboardPage({
                 스토리보드 생성
               </Button>
               <Button variant="outline" asChild>
-                <Link href={`/dashboard/${orgSlug}/projects/${slug}`}>취소</Link>
+                <Link href={`/dashboard/${orgSlug}/projects/${slug}`}>
+                  취소
+                </Link>
               </Button>
             </div>
           </form>

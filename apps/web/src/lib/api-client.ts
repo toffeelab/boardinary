@@ -1,0 +1,45 @@
+import type { ApiErrorResponse } from "@repo/types";
+
+const API_URL = process.env.API_URL ?? "http://localhost:4001";
+const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET ?? "";
+
+export async function apiClient<T>(
+  path: string,
+  options: {
+    method?: string;
+    body?: unknown;
+    userId?: string;
+    timeout?: number;
+  } = {},
+): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    options.timeout ?? 5000,
+  );
+
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      method: options.method ?? "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": INTERNAL_SECRET,
+        ...(options.userId ? { "X-User-Id": options.userId } : {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const error: ApiErrorResponse = await res.json().catch(() => ({
+        statusCode: res.status,
+        message: `API error: ${res.status}`,
+      }));
+      throw new Error(error.message);
+    }
+
+    return res.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}

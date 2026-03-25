@@ -1,2 +1,2 @@
-export { users, accounts, sessions, verificationTokens } from "./schema.js";
-export { db } from "./connection.js";
+export { users, accounts, sessions, verificationTokens } from "./schema";
+export { db } from "./connection";

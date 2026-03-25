@@ -1,13 +1,9 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Plus, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCurrentUserId } from "@/lib/auth";
-import {
-  getOrganizationBySlug,
-  isOrgMember,
-} from "@/data-access/organizations";
-import { getProjectsByOrgId } from "@/data-access/projects";
+import { apiClient } from "@/lib/api-client";
+import type { OrganizationDto, ProjectDto } from "@repo/types";
 import { ProjectList } from "@/components/dashboard/project-list";
 import { EmptyState } from "@/components/shared/empty-state";
 
@@ -19,13 +15,14 @@ export default async function OrgDashboardPage({
   const { orgSlug } = await params;
   const userId = await getCurrentUserId();
 
-  const org = await getOrganizationBySlug(orgSlug);
-  if (!org) notFound();
-
-  const isMember = await isOrgMember(org.id, userId);
-  if (!isMember) notFound();
-
-  const projects = await getProjectsByOrgId(org.id);
+  const org = await apiClient<OrganizationDto>(
+    `/api/organizations/${orgSlug}`,
+    { userId },
+  );
+  const projects = await apiClient<ProjectDto[]>(
+    `/api/organizations/${orgSlug}/projects`,
+    { userId },
+  );
 
   return (
     <div>
@@ -51,7 +48,7 @@ export default async function OrgDashboardPage({
             name: p.name,
             slug: p.slug,
             description: p.description,
-            updatedAt: p.updatedAt,
+            updatedAt: new Date(p.updatedAt),
           }))}
           orgSlug={orgSlug}
         />
