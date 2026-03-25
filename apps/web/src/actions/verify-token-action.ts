@@ -9,7 +9,7 @@ export async function verifyTokenAction(formData: FormData) {
   const email = cookieStore.get("verify-email")?.value;
 
   if (!token || !email) {
-    redirect("/auth/verify-request");
+    redirect("/login/verify");
   }
 
   const callbackUrl = new URL(
