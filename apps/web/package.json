@@ -4,29 +4,24 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "next dev --port 4000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
-    "check-types": "next typegen && tsc --noEmit",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio",
-    "db:seed:sample": "tsx src/db/seed.ts"
+    "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
-    "@paralleldrive/cuid2": "^3.3.0",
+    "@repo/db": "workspace:*",
+    "@repo/types": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tailwindcss/postcss": "^4.2.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "drizzle-orm": "^0.45.1",
     "lucide-react": "^1.6.0",
     "next": "16.2.0",
     "next-auth": "5.0.0-beta.30",
     "next-themes": "^0.4.6",
-    "postgres": "^3.4.8",
     "radix-ui": "^1.4.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -39,12 +34,9 @@
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/cli": "^4.2.2",
     "@types/node": "^22.15.3",
-    "@types/pg": "^8.20.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
-    "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.1",
-    "tsx": "^4.21.0",
     "typescript": "5.9.2"
   }
 }
