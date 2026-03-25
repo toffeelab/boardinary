@@ -19,9 +19,12 @@
 ```
 boardinary/
 ├── apps/
-│   ├── web/              # 메인 웹앱 (Next.js 16, port 3000)
-│   └── docs/             # 문서 사이트 (Next.js 16, port 3001)
+│   ├── web/              # 메인 웹앱 (Next.js 16, port 4000)
+│   ├── api/              # REST API 서버 (NestJS, port 4001)
+│   └── docs/             # 문서 사이트 (Next.js 16, port 4002)
 ├── packages/
+│   ├── db/               # 공유 DB 스키마/연결 (@repo/db)
+│   ├── types/            # 공유 타입 (@repo/types)
 │   ├── ui/               # 공유 UI 컴포넌트 (@repo/ui)
 │   ├── eslint-config/    # 공유 ESLint 설정 (@repo/eslint-config)
 │   └── typescript-config/ # 공유 TypeScript 설정 (@repo/typescript-config)
@@ -69,23 +72,23 @@ pnpm --filter web build         # web 앱만 빌드
 pnpm --filter @repo/ui lint     # UI 패키지만 린트
 ```
 
-### 데이터베이스 (apps/web에서 실행)
+### 데이터베이스 (packages/db에서 실행)
 
 ```bash
-pnpm --filter web db:generate   # Drizzle 스키마 → 마이그레이션 SQL 생성
-pnpm --filter web db:migrate    # PostgreSQL 마이그레이션 실행
-pnpm --filter web db:studio     # Drizzle Studio (DB GUI)
-pnpm --filter web db:seed:sample # 샘플 데이터 시드
-pnpm --filter web test          # 테스트 실행 (Docker PG 필요)
+pnpm --filter @repo/db db:generate   # Drizzle 스키마 → 마이그레이션 SQL 생성
+pnpm --filter @repo/db db:migrate    # PostgreSQL 마이그레이션 실행
+pnpm --filter @repo/db db:studio     # Drizzle Studio (DB GUI)
+pnpm --filter @repo/db db:seed:sample # 샘플 데이터 시드
+pnpm --filter web test               # 테스트 실행 (Docker PG 필요)
 ```
 
 ### 로컬 개발 시작
 
 ```bash
-docker compose up -d              # PostgreSQL 컨테이너 기동
-pnpm --filter web db:migrate      # 마이그레이션 실행 (최초 1회 또는 스키마 변경 시)
-pnpm --filter web db:seed:sample  # 샘플 데이터 시드 (선택)
-pnpm dev                          # 모든 앱 동시 실행
+docker compose up -d                    # PostgreSQL 컨테이너 기동 (port 6432)
+pnpm --filter @repo/db db:migrate       # 마이그레이션 실행 (최초 1회 또는 스키마 변경 시)
+pnpm --filter @repo/db db:seed:sample   # 샘플 데이터 시드 (선택)
+pnpm dev                                # 모든 앱 동시 실행 (web:4000, api:4001, docs:4002)
 ```
 
 ## 코드 컨벤션

@@ -16,7 +16,7 @@ export default async function StoryboardDetailPage({
 }: {
   params: Promise<{ orgSlug: string; slug: string; id: string }>;
 }) {
-  const { orgSlug, slug, id } = await params;
+  const { id } = await params;
   const userId = await getCurrentUserId();
 
   let storyboard: StoryboardDto;

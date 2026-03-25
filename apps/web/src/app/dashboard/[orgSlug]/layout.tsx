@@ -18,9 +18,8 @@ export default async function OrgLayout({
   const { orgSlug } = await params;
   const userId = await getCurrentUserId();
 
-  let org: OrganizationDto;
   try {
-    org = await apiClient<OrganizationDto>(
+    await apiClient<OrganizationDto>(
       `/api/organizations/${orgSlug}`,
       { userId },
     );
