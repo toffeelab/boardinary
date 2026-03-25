@@ -52,12 +52,13 @@ export async function Topbar() {
                 await signOut({ redirectTo: "/" });
               }}
             >
-              <DropdownMenuItem asChild>
-                <button type="submit" className="w-full">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  로그아웃
-                </button>
-              </DropdownMenuItem>
+              <button
+                type="submit"
+                className="flex w-full items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground cursor-pointer"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                로그아웃
+              </button>
             </form>
           </DropdownMenuContent>
         </DropdownMenu>
