@@ -3,12 +3,25 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts",
-    "./auth": "./src/auth-schema.ts",
-    "./schema": "./src/schema.ts",
-    "./connection": "./src/connection.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./auth": {
+      "types": "./src/auth-schema.ts",
+      "default": "./dist/auth-schema.js"
+    },
+    "./schema": {
+      "types": "./src/schema.ts",
+      "default": "./dist/schema.js"
+    },
+    "./connection": {
+      "types": "./src/connection.ts",
+      "default": "./dist/connection.js"
+    }
   },
   "scripts": {
+    "build": "tsc",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio --port 4003",

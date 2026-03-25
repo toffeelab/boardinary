@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -11,8 +12,8 @@ import { IS_PUBLIC_KEY } from "./public.decorator";
 @Injectable()
 export class InternalAuthGuard implements CanActivate {
   constructor(
-    private configService: ConfigService,
-    private reflector: Reflector,
+    @Inject(ConfigService) private configService: ConfigService,
+    @Inject(Reflector) private reflector: Reflector,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
