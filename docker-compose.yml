@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: boardinary-postgres
+    restart: unless-stopped
+    ports:
+      - "6432:5432"
+    environment:
+      POSTGRES_USER: boardinary
+      POSTGRES_PASSWORD: boardinary
+      POSTGRES_DB: boardinary
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
+
+volumes:
+  pgdata:
