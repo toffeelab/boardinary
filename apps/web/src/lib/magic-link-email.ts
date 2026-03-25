@@ -1,4 +1,4 @@
-export function magicLinkEmailHtml(url: string) {
+export function magicLinkEmailHtml(url: string, token: string) {
   return `
 <!DOCTYPE html>
 <html lang="ko">
@@ -45,21 +45,18 @@ export function magicLinkEmailHtml(url: string) {
               <!-- Divider -->
               <hr style="border:none;border-top:1px solid #2e2854;margin:0 0 20px;">
 
-              <!-- Alternative: Copy Link -->
-              <p style="margin:0 0 8px;font-size:12px;color:#a1a1c7;text-align:center;">
-                버튼이 작동하지 않으면 아래 링크를 복사해서 브라우저에 붙여넣으세요.
-              </p>
-              <p style="margin:0 0 20px;font-size:11px;color:#8b5cf6;text-align:center;word-break:break-all;">
-                ${url}
-              </p>
-
-              <!-- Info Box -->
+              <!-- Verification Code for cross-browser -->
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                 <tr>
-                  <td style="background-color:#0c0a1a;border-radius:8px;padding:16px;">
-                    <p style="margin:0;font-size:12px;line-height:1.5;color:#a1a1c7;">
-                      <strong style="color:#e2e8f0;">다른 기기에서 로그인하고 싶으신가요?</strong><br>
-                      이 이메일의 링크를 원하는 기기의 브라우저에서 열면 됩니다. PC, 태블릿, 모바일 어디서든 사용 가능합니다.
+                  <td style="background-color:#0c0a1a;border-radius:8px;padding:20px;text-align:center;">
+                    <p style="margin:0 0 8px;font-size:12px;color:#a1a1c7;">
+                      다른 브라우저에서 로그인하시나요? 아래 인증 코드를 복사하세요.
+                    </p>
+                    <p style="margin:0;font-size:14px;font-family:monospace;color:#a78bfa;word-break:break-all;padding:12px;background-color:#1e1b3a;border:1px solid #2e2854;border-radius:6px;">
+                      ${token}
+                    </p>
+                    <p style="margin:8px 0 0;font-size:11px;color:#6b7280;">
+                      이메일 확인 화면에서 이 코드를 붙여넣으세요.
                     </p>
                   </td>
                 </tr>
@@ -84,6 +81,15 @@ export function magicLinkEmailHtml(url: string) {
 </html>`;
 }
 
-export function magicLinkEmailText(url: string) {
-  return `Boardinary 로그인\n\n아래 링크를 클릭하면 Boardinary에 로그인됩니다:\n${url}\n\n이 링크는 24시간 동안 유효하며, 한 번만 사용할 수 있습니다.\n다른 기기에서도 이 링크를 열 수 있습니다.\n\n이 메일을 요청한 적이 없다면 무시해주세요.`;
+export function magicLinkEmailText(url: string, token: string) {
+  return `Boardinary 로그인
+
+아래 링크를 클릭하면 Boardinary에 로그인됩니다:
+${url}
+
+다른 브라우저에서 로그인하시나요? 아래 인증 코드를 이메일 확인 화면에 붙여넣으세요:
+${token}
+
+이 링크는 24시간 동안 유효하며, 한 번만 사용할 수 있습니다.
+이 메일을 요청한 적이 없다면 무시해주세요.`;
 }

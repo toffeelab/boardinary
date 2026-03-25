@@ -32,13 +32,17 @@ const nextAuth = NextAuth({
     Resend({
       from: process.env.AUTH_EMAIL_FROM ?? "noreply@boardinary.com",
       async sendVerificationRequest({ identifier: email, url, provider }) {
+        // URL에서 토큰 추출 (다른 브라우저에서 수동 입력용)
+        const urlObj = new URL(url);
+        const token = urlObj.searchParams.get("token") ?? "";
+
         const resend = new ResendClient(process.env.AUTH_RESEND_KEY!);
         await resend.emails.send({
           from: provider.from!,
           to: email,
           subject: "Boardinary 로그인 링크",
-          html: magicLinkEmailHtml(url),
-          text: magicLinkEmailText(url),
+          html: magicLinkEmailHtml(url, token),
+          text: magicLinkEmailText(url, token),
         });
       },
     }),

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { auth, signIn } from "@/auth";
 import { Button } from "@/components/ui/button";
@@ -105,7 +106,15 @@ export default async function LoginPage() {
               action={async (formData: FormData) => {
                 "use server";
                 const email = formData.get("email") as string;
-                await signIn("resend", { email, redirectTo: "/dashboard" });
+                (await cookies()).set("verify-email", email, {
+                  maxAge: 3600,
+                  httpOnly: true,
+                  sameSite: "lax",
+                });
+                await signIn("resend", {
+                  email,
+                  redirectTo: "/dashboard",
+                });
               }}
               className="space-y-3"
             >
