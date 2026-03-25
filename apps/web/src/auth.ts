@@ -64,22 +64,34 @@ const nextAuth = NextAuth({
   events: {
     async createUser({ user }) {
       if (!user.id) return;
-      try {
-        await fetch(`${API_URL}/api/users/setup`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Internal-Secret": INTERNAL_SECRET,
-            "X-User-Id": user.id,
-          },
-          body: JSON.stringify({
-            userId: user.id,
-            name: user.name ?? null,
-          }),
-        });
-      } catch {
-        // Prevent app crash
+
+      const setupPayload = {
+        userId: user.id,
+        name: user.name ?? null,
+      };
+      const headers = {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": INTERNAL_SECRET,
+        "X-User-Id": user.id,
+      };
+
+      // 최대 3회 재시도 (API 서버 시작 타이밍 이슈 대비)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const res = await fetch(`${API_URL}/api/users/setup`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(setupPayload),
+          });
+          if (res.ok) return;
+        } catch {
+          // 재시도
+        }
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        }
       }
+      // 3회 실패 — 다음 로그인 시 대시보드에서 lazy init으로 처리 가능
     },
   },
 });

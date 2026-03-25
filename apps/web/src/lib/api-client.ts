@@ -31,11 +31,15 @@ export async function apiClient<T>(
     });
 
     if (!res.ok) {
-      const error: ApiErrorResponse = await res.json().catch(() => ({
+      const error = await res.json().catch((): ApiErrorResponse => ({
         statusCode: res.status,
         message: `API error: ${res.status}`,
       }));
-      throw new Error(error.message);
+      throw new Error(
+        typeof error?.message === "string"
+          ? error.message
+          : `API error: ${res.status}`,
+      );
     }
 
     return res.json();
