@@ -53,7 +53,7 @@ export default async function NewStoryboardPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={createStoryboardAction} className="space-y-4">
+          <form action={createStoryboardAction as unknown as (formData: FormData) => void} className="space-y-4">
             <input type="hidden" name="orgSlug" value={orgSlug} />
             <input type="hidden" name="projectSlug" value={slug} />
 

@@ -38,7 +38,7 @@ export default async function NewProjectPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={createProjectAction} className="space-y-4">
+          <form action={createProjectAction as unknown as (formData: FormData) => void} className="space-y-4">
             <input type="hidden" name="orgSlug" value={orgSlug} />
             <div className="space-y-2">
               <Label htmlFor="name">프로젝트 이름</Label>
