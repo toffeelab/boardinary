@@ -1,6 +1,7 @@
 import NextAuth, { type NextAuthResult } from "next-auth";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import Resend from "next-auth/providers/resend";
+import { Resend as ResendClient } from "resend";
 import {
   db,
   users,
@@ -9,6 +10,10 @@ import {
   verificationTokens,
 } from "@repo/db/auth";
 import authConfig from "./auth.config";
+import {
+  magicLinkEmailHtml,
+  magicLinkEmailText,
+} from "@/lib/magic-link-email";
 
 const API_URL = process.env.API_URL ?? "http://localhost:4001";
 const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET ?? "";
@@ -26,6 +31,16 @@ const nextAuth = NextAuth({
     ...authConfig.providers,
     Resend({
       from: process.env.AUTH_EMAIL_FROM ?? "noreply@boardinary.com",
+      async sendVerificationRequest({ identifier: email, url, provider }) {
+        const resend = new ResendClient(process.env.AUTH_RESEND_KEY!);
+        await resend.emails.send({
+          from: provider.from!,
+          to: email,
+          subject: "Boardinary 로그인 링크",
+          html: magicLinkEmailHtml(url),
+          text: magicLinkEmailText(url),
+        });
+      },
     }),
   ],
   callbacks: {
