@@ -44,7 +44,7 @@ export default async function VerifyRequestPage() {
 
           {email && (
             <CardContent className="space-y-4">
-              <VerifyTokenForm />
+              <VerifyTokenForm email={email} />
               <p className="text-center text-xs text-muted-foreground">
                 이메일에서 링크를 직접 클릭해도 로그인됩니다.
                 <br />
