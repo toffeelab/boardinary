@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Mail, KeyRound } from "lucide-react";
+import { verifyTokenAction } from "@/actions/verify-token-action";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -50,27 +50,7 @@ export default async function VerifyRequestPage() {
             <CardContent className="space-y-4">
               {/* Token input — primary action */}
               <form
-                action={async (formData: FormData) => {
-                  "use server";
-                  const token = (formData.get("token") as string)?.trim();
-                  const cookieStore = await cookies();
-                  const storedEmail = cookieStore.get("verify-email")?.value;
-
-                  if (!token || !storedEmail) {
-                    redirect("/auth/verify-request");
-                  }
-
-                  const callbackUrl = new URL(
-                    "/api/auth/callback/resend",
-                    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4000",
-                  );
-                  callbackUrl.searchParams.set("token", token);
-                  callbackUrl.searchParams.set("email", storedEmail);
-                  callbackUrl.searchParams.set("callbackUrl", "/dashboard");
-
-                  cookieStore.delete("verify-email");
-                  redirect(callbackUrl.toString());
-                }}
+                action={verifyTokenAction}
                 className="space-y-3"
               >
                 <div className="space-y-2">
