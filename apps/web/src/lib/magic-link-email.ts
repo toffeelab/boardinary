@@ -42,21 +42,36 @@ export function magicLinkEmailHtml(url: string, token: string) {
                 </tr>
               </table>
 
-              <!-- Divider -->
-              <hr style="border:none;border-top:1px solid #2e2854;margin:0 0 20px;">
+              <!-- Divider with text -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 20px;">
+                <tr>
+                  <td style="border-bottom:1px solid #2e2854;line-height:0;">&nbsp;</td>
+                  <td style="padding:0 12px;white-space:nowrap;font-size:11px;color:#6b7280;">또는</td>
+                  <td style="border-bottom:1px solid #2e2854;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
 
-              <!-- Verification Code for cross-browser -->
+              <!-- Verification Code Section -->
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                 <tr>
-                  <td style="background-color:#0c0a1a;border-radius:8px;padding:20px;text-align:center;">
-                    <p style="margin:0 0 8px;font-size:12px;color:#a1a1c7;">
-                      다른 브라우저에서 로그인하시나요? 아래 인증 코드를 복사하세요.
+                  <td style="background-color:#0c0a1a;border-radius:12px;padding:24px;text-align:center;border:1px solid #2e2854;">
+                    <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:#e2e8f0;">
+                      인증 코드
                     </p>
-                    <p style="margin:0;font-size:14px;font-family:monospace;color:#a78bfa;word-break:break-all;padding:12px;background-color:#1e1b3a;border:1px solid #2e2854;border-radius:6px;">
-                      ${token}
+                    <p style="margin:0 0 16px;font-size:12px;color:#a1a1c7;">
+                      다른 브라우저에서 로그인할 때 이 코드를 붙여넣으세요
                     </p>
-                    <p style="margin:8px 0 0;font-size:11px;color:#6b7280;">
-                      이메일 확인 화면에서 이 코드를 붙여넣으세요.
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                      <tr>
+                        <td style="background-color:#1e1b3a;border:2px solid #8b5cf6;border-radius:8px;padding:16px 12px;text-align:center;">
+                          <p style="margin:0;font-size:13px;font-family:'Courier New',Courier,monospace;color:#a78bfa;word-break:break-all;letter-spacing:0.5px;line-height:1.5;user-select:all;">
+                            ${token}
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:12px 0 0;font-size:11px;color:#6b7280;">
+                      코드를 선택하고 복사(Ctrl+C / Cmd+C)하세요
                     </p>
                   </td>
                 </tr>
