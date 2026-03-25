@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { Mail, KeyRound } from "lucide-react";
-import { verifyTokenAction } from "@/actions/verify-token-action";
+import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,8 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { VerifyTokenForm } from "@/components/shared/verify-token-form";
 
 export default async function VerifyRequestPage() {
   const cookieStore = await cookies();
@@ -20,14 +18,12 @@ export default async function VerifyRequestPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-6">
-        {/* Logo */}
         <div className="text-center">
           <Link href="/">
             <h1 className="text-3xl font-bold text-primary">Boardinary</h1>
           </Link>
         </div>
 
-        {/* Main card */}
         <Card>
           <CardHeader className="text-center">
             <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
@@ -48,31 +44,7 @@ export default async function VerifyRequestPage() {
 
           {email && (
             <CardContent className="space-y-4">
-              {/* Token input — primary action */}
-              <form
-                action={verifyTokenAction}
-                className="space-y-3"
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="token" className="flex items-center gap-1.5 text-sm font-medium">
-                    <KeyRound className="h-3.5 w-3.5" />
-                    인증 코드
-                  </Label>
-                  <Input
-                    id="token"
-                    name="token"
-                    type="text"
-                    placeholder="이메일의 인증 코드를 붙여넣으세요"
-                    required
-                    autoComplete="off"
-                    className="h-11 font-mono text-center tracking-wider"
-                  />
-                </div>
-                <Button type="submit" className="w-full">
-                  인증하기
-                </Button>
-              </form>
-
+              <VerifyTokenForm />
               <p className="text-center text-xs text-muted-foreground">
                 이메일에서 링크를 직접 클릭해도 로그인됩니다.
                 <br />
@@ -90,7 +62,6 @@ export default async function VerifyRequestPage() {
           )}
         </Card>
 
-        {/* Bottom info */}
         <div className="space-y-3 text-center">
           <p className="text-xs text-muted-foreground">
             메일이 보이지 않으면 스팸함을 확인해주세요.

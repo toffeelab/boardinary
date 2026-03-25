@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
 export async function verifyTokenAction(formData: FormData) {
   const token = (formData.get("token") as string)?.trim();
@@ -9,7 +8,7 @@ export async function verifyTokenAction(formData: FormData) {
   const email = cookieStore.get("verify-email")?.value;
 
   if (!token || !email) {
-    redirect("/login/verify");
+    return { error: "인증 코드 또는 이메일 정보가 없습니다." };
   }
 
   const callbackUrl = new URL(
@@ -21,5 +20,8 @@ export async function verifyTokenAction(formData: FormData) {
   callbackUrl.searchParams.set("callbackUrl", "/dashboard");
 
   cookieStore.delete("verify-email");
-  redirect(callbackUrl.toString());
+
+  // redirect() 대신 URL을 반환 — 클라이언트에서 window.location.href로 이동해야
+  // Auth.js 콜백이 Set-Cookie를 정상적으로 설정할 수 있음
+  return { redirectUrl: callbackUrl.toString() };
 }
