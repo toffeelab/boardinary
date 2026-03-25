@@ -113,8 +113,12 @@ export default async function LoginPage() {
                 });
                 await signIn("resend", {
                   email,
-                  redirectTo: "/dashboard",
+                  redirect: false,
                 });
+                const { redirect: nextRedirect } = await import(
+                  "next/navigation"
+                );
+                nextRedirect("/login/verify");
               }}
               className="space-y-3"
             >

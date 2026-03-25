@@ -6,7 +6,6 @@ export default {
   providers: [Google, GitHub],
   pages: {
     signIn: "/login",
-    verifyRequest: "/login/verify",
     error: "/login/error",
   },
 } satisfies NextAuthConfig;
