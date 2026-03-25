@@ -70,4 +70,16 @@
   body {
     @apply bg-background text-foreground;
   }
+  button,
+  [role="button"],
+  a,
+  select,
+  [type="checkbox"],
+  [type="radio"],
+  label[for] {
+    cursor: pointer;
+  }
+  .underline {
+    cursor: pointer;
+  }
 }
