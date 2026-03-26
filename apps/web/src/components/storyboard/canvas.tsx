@@ -1,59 +1,61 @@
 "use client";
 
-import { useCallback } from "react";
 import {
   ReactFlow,
   Background,
   MiniMap,
   Controls,
-  useNodesState,
-  useEdgesState,
-  addEdge,
   type Connection,
   type Node,
   type Edge,
+  type NodeChange,
+  type EdgeChange,
+  type Viewport,
   BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { nodeTypes } from "./nodes/node-types";
 import { edgeTypes } from "./edges/edge-types";
-import { useEditorStore } from "@/stores/editor-store";
 
 interface CanvasProps {
-  initialNodes: Node[];
-  initialEdges: Edge[];
+  nodes: Node[];
+  edges: Edge[];
+  onNodesChange: (changes: NodeChange[]) => void;
+  onEdgesChange: (changes: EdgeChange[]) => void;
+  onConnect: (connection: Connection) => void;
+  onSelectionChange: (params: { nodes: Node[] }) => void;
+  onNodeDragStop: (
+    event: React.MouseEvent,
+    node: Node,
+    nodes: Node[],
+  ) => void;
+  onMoveEnd: (
+    event: MouseEvent | TouchEvent | null,
+    viewport: Viewport,
+  ) => void;
 }
 
-export function Canvas({ initialNodes, initialEdges }: CanvasProps) {
-  const [nodes, setNodes, onNodesChangeHandler] =
-    useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChangeHandler] =
-    useEdgesState(initialEdges);
-  const { setSelectedNodeId } = useEditorStore();
-
-  const handleConnect = useCallback(
-    (params: Connection) => {
-      setEdges((eds) => addEdge({ ...params, type: "labeled" }, eds));
-    },
-    [setEdges],
-  );
-
-  const handleSelectionChange = useCallback(
-    ({ nodes: selectedNodes }: { nodes: Node[] }) => {
-      setSelectedNodeId(selectedNodes[0]?.id ?? null);
-    },
-    [setSelectedNodeId],
-  );
-
+export function Canvas({
+  nodes,
+  edges,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  onSelectionChange,
+  onNodeDragStop,
+  onMoveEnd,
+}: CanvasProps) {
   return (
     <div className="h-full w-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChangeHandler}
-        onEdgesChange={onEdgesChangeHandler}
-        onConnect={handleConnect}
-        onSelectionChange={handleSelectionChange}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onSelectionChange={onSelectionChange}
+        onNodeDragStop={onNodeDragStop}
+        onMoveEnd={onMoveEnd}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: "labeled" }}
