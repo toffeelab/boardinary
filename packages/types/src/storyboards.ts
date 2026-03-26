@@ -22,9 +22,41 @@ export interface CreateStoryboardDto {
   genre?: string;
 }
 
+export interface StoryboardNodeData {
+  title: string;
+  description?: string;
+  tags?: string[];
+  color?: string;
+  choices?: Array<{ id: string; label: string }>;
+}
+
+export interface StoryboardNode {
+  id: string;
+  type: "scene" | "event" | "branch";
+  position: { x: number; y: number };
+  data: StoryboardNodeData;
+}
+
+export interface StoryboardEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  label?: string;
+}
+
+export interface StoryboardContentV1 {
+  version: 1;
+  viewport: { x: number; y: number; zoom: number };
+  nodes: StoryboardNode[];
+  edges: StoryboardEdge[];
+}
+
 export interface UpdateStoryboardDto {
   name?: string;
   description?: string;
   genre?: string;
   tags?: string[];
+  content?: StoryboardContentV1;
+  contentVersion?: number;
 }

@@ -2,9 +2,11 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
 } from "@nestjs/common";
 import { eq, and, ne } from "drizzle-orm";
 import { db, storyboards, projects, orgMembers } from "@repo/db";
+import type { StoryboardContentV1 } from "@repo/types";
 
 @Injectable()
 export class StoryboardsService {
@@ -93,11 +95,59 @@ export class StoryboardsService {
       description?: string;
       genre?: string;
       tags?: string[];
+      content?: StoryboardContentV1;
+      contentVersion?: number;
     },
   ) {
+    const { content, contentVersion, ...metadata } = data;
+
+    // Content update with optimistic locking
+    if (content !== undefined) {
+      if (contentVersion === undefined) {
+        throw new ConflictException(
+          "contentVersion is required when updating content",
+        );
+      }
+
+      const [storyboard] = await db
+        .update(storyboards)
+        .set({
+          ...metadata,
+          content,
+          contentVersion: contentVersion + 1,
+          updatedBy: userId,
+        })
+        .where(
+          and(
+            eq(storyboards.id, id),
+            eq(storyboards.contentVersion, contentVersion),
+          ),
+        )
+        .returning();
+
+      if (!storyboard) {
+        // Check if storyboard exists to distinguish 404 from 409
+        const [existing] = await db
+          .select({ id: storyboards.id })
+          .from(storyboards)
+          .where(eq(storyboards.id, id))
+          .limit(1);
+
+        if (!existing) {
+          throw new NotFoundException("Storyboard not found");
+        }
+        throw new ConflictException(
+          "Content version conflict. Another user has modified this storyboard.",
+        );
+      }
+
+      return storyboard;
+    }
+
+    // Metadata-only update (existing behavior)
     const [storyboard] = await db
       .update(storyboards)
-      .set({ ...data, updatedBy: userId })
+      .set({ ...metadata, updatedBy: userId })
       .where(eq(storyboards.id, id))
       .returning();
     if (!storyboard) throw new NotFoundException("Storyboard not found");
