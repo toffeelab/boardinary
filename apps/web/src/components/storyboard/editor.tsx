@@ -198,11 +198,11 @@ function EditorInner({
           { ...params, type: "labeled", label: "" },
           eds,
         );
-        markDirtyAndSave(reactFlowInstance.getNodes(), newEdges);
+        markDirtyAndSave(nodesRef.current, newEdges);
         return newEdges;
       });
     },
-    [pushSnapshot, setEdges, reactFlowInstance, markDirtyAndSave],
+    [pushSnapshot, setEdges, markDirtyAndSave],
   );
 
   // Selection change handler
@@ -297,9 +297,7 @@ function EditorInner({
   const handleShortcutSave = useCallback(() => {
     const viewport = reactFlowInstance.getViewport();
     viewportRef.current = viewport;
-    const currentNodes = reactFlowInstance.getNodes();
-    const currentEdges = reactFlowInstance.getEdges();
-    immediateSave(currentNodes, currentEdges, viewport);
+    immediateSave(nodesRef.current, edgesRef.current, viewport);
   }, [reactFlowInstance, immediateSave]);
 
   const handleShortcutUndo = useCallback(() => {
