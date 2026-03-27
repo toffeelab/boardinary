@@ -752,7 +752,12 @@ function EditorInner({
           <PanelGroup orientation="horizontal" className="min-h-0 flex-1">
             {leftPanel && (
               <>
-                <Panel defaultSize={20} minSize={15} maxSize={30}>
+                <Panel
+                  defaultSize={20}
+                  minSize={15}
+                  maxSize={30}
+                  className="overflow-hidden"
+                >
                   {leftPanel}
                 </Panel>
                 <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-primary" />
@@ -764,7 +769,12 @@ function EditorInner({
             {rightPanel && (
               <>
                 <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-primary" />
-                <Panel defaultSize={20} minSize={15} maxSize={30}>
+                <Panel
+                  defaultSize={20}
+                  minSize={15}
+                  maxSize={30}
+                  className="overflow-hidden"
+                >
                   {rightPanel}
                 </Panel>
               </>

@@ -90,13 +90,17 @@ export function PropertyPanel({
 
   if (!selectedNode || !nodeData) {
     return (
-      <aside className="flex h-full flex-col bg-card">
+      <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
         <div className="px-4 py-3">
-          <h2 className="text-sm font-semibold text-foreground">속성</h2>
+          <h2 className="truncate text-sm font-semibold text-foreground">
+            속성
+          </h2>
         </div>
         <Separator />
-        <div className="flex flex-1 items-center justify-center">
-          <p className="text-sm text-muted-foreground">노드를 선택하세요</p>
+        <div className="flex min-w-0 flex-1 items-center justify-center">
+          <p className="whitespace-nowrap text-sm text-muted-foreground">
+            노드를 선택하세요
+          </p>
         </div>
       </aside>
     );
@@ -105,12 +109,14 @@ export function PropertyPanel({
   const nodeType = selectedNode.type as "scene" | "event" | "branch";
 
   return (
-    <aside className="flex h-full flex-col bg-card">
+    <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
       <div className="px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">속성</h2>
+        <h2 className="truncate text-sm font-semibold text-foreground">
+          속성
+        </h2>
       </div>
       <Separator />
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
+      <div className="min-w-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-4 py-3">
         {/* 제목 */}
         <div className="space-y-1.5">
           <Label htmlFor="node-title" className="text-xs">
