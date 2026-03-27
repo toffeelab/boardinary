@@ -50,6 +50,8 @@ export function Toolbar({ onAddNode }: ToolbarProps) {
         variant={isNodeListOpen ? "secondary" : "ghost"}
         size="sm"
         onClick={toggleNodeList}
+        disabled={layoutPreset === "property-only"}
+        title={layoutPreset === "property-only" ? "속성만 레이아웃에서는 목록을 사용할 수 없습니다" : undefined}
       >
         {isNodeListOpen ? "목록 닫기" : "목록 열기"}
       </Button>

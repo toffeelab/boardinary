@@ -229,6 +229,12 @@ function EditorInner({
   const handleSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[] }) => {
       setSelectedNodeId(selectedNodes[0]?.id ?? null);
+      // Sync selection state to nodesRef so group/align/distribute read fresh data
+      const selectedIds = new Set(selectedNodes.map((n) => n.id));
+      nodesRef.current = nodesRef.current.map((n) => ({
+        ...n,
+        selected: selectedIds.has(n.id),
+      }));
     },
     [setSelectedNodeId],
   );
@@ -352,6 +358,9 @@ function EditorInner({
     if (snapshot) {
       setNodes(snapshot.nodes);
       setEdges(snapshot.edges);
+      // Explicitly sync refs to avoid race between React state and ref reads
+      nodesRef.current = snapshot.nodes;
+      edgesRef.current = snapshot.edges;
       markDirtyAndSave(snapshot.nodes, snapshot.edges);
     }
   }, [undo, setNodes, setEdges, markDirtyAndSave]);
@@ -361,6 +370,9 @@ function EditorInner({
     if (snapshot) {
       setNodes(snapshot.nodes);
       setEdges(snapshot.edges);
+      // Explicitly sync refs to avoid race between React state and ref reads
+      nodesRef.current = snapshot.nodes;
+      edgesRef.current = snapshot.edges;
       markDirtyAndSave(snapshot.nodes, snapshot.edges);
     }
   }, [redo, setNodes, setEdges, markDirtyAndSave]);
@@ -772,6 +784,8 @@ function EditorInner({
                     y={contextMenu.y}
                     onAlign={handleAlign}
                     onDistribute={handleDistribute}
+                    onGroup={handleGroupNodes}
+                    onUngroup={handleUngroupNodes}
                     onClose={handleCloseContextMenu}
                   />
                 )}

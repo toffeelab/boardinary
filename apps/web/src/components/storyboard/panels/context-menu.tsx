@@ -8,6 +8,8 @@ import {
   AlignEndHorizontal,
   AlignHorizontalSpaceBetween,
   AlignVerticalSpaceBetween,
+  Group,
+  Ungroup,
 } from "lucide-react";
 
 export type AlignDirection = "left" | "right" | "top" | "bottom";
@@ -18,6 +20,8 @@ interface ContextMenuProps {
   y: number;
   onAlign: (direction: AlignDirection) => void;
   onDistribute: (axis: DistributeAxis) => void;
+  onGroup: () => void;
+  onUngroup: () => void;
   onClose: () => void;
 }
 
@@ -26,6 +30,8 @@ export function ContextMenu({
   y,
   onAlign,
   onDistribute,
+  onGroup,
+  onUngroup,
   onClose,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -110,6 +116,32 @@ export function ContextMenu({
     },
   ];
 
+  const groupItems: Array<{
+    label: string;
+    icon: React.ReactNode;
+    shortcut: string;
+    action: () => void;
+  }> = [
+    {
+      label: "그룹",
+      icon: <Group className="h-4 w-4" />,
+      shortcut: "Ctrl+G",
+      action: () => {
+        onGroup();
+        onClose();
+      },
+    },
+    {
+      label: "그룹 해제",
+      icon: <Ungroup className="h-4 w-4" />,
+      shortcut: "Ctrl+Shift+G",
+      action: () => {
+        onUngroup();
+        onClose();
+      },
+    },
+  ];
+
   return (
     <div
       ref={menuRef}
@@ -125,6 +157,21 @@ export function ContextMenu({
         >
           {item.icon}
           {item.label}
+        </button>
+      ))}
+      <div className="my-1 h-px bg-border" />
+      {groupItems.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          className="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground"
+          onClick={item.action}
+        >
+          <span className="flex items-center gap-2">
+            {item.icon}
+            {item.label}
+          </span>
+          <span className="text-xs text-muted-foreground">{item.shortcut}</span>
         </button>
       ))}
     </div>
