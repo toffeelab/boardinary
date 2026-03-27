@@ -18,6 +18,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { nodeTypes } from "./nodes/node-types";
 import { edgeTypes } from "./edges/edge-types";
+import { useEdgeValidation } from "./hooks/use-edge-validation";
 
 interface CanvasProps {
   nodes: Node[];
@@ -53,6 +54,7 @@ export function Canvas({
   onNodeDrop,
 }: CanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
+  const { isValidConnection } = useEdgeValidation(edges);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -88,6 +90,7 @@ export function Canvas({
         onMoveEnd={onMoveEnd}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: "labeled" }}
