@@ -20,7 +20,7 @@ const NODE_TYPE_CONFIG = {
 type NodeType = keyof typeof NODE_TYPE_CONFIG;
 
 export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
-  const { isNodeListOpen, selectedNodeId } = useEditorStore();
+  const { selectedNodeId } = useEditorStore();
 
   const groupedNodes = useMemo(() => {
     const groups: Record<NodeType, Node[]> = {
@@ -37,12 +37,10 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
     return groups;
   }, [nodes]);
 
-  if (!isNodeListOpen) return null;
-
   const hasNodes = nodes.length > 0;
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-border bg-card">
+    <aside className="flex h-full flex-col bg-card">
       <div className="px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">노드 목록</h2>
       </div>

@@ -90,7 +90,7 @@ export function PropertyPanel({
 
   if (!selectedNode || !nodeData) {
     return (
-      <aside className="flex h-full w-72 flex-col border-l border-border bg-card">
+      <aside className="flex h-full flex-col bg-card">
         <div className="px-4 py-3">
           <h2 className="text-sm font-semibold text-foreground">속성</h2>
         </div>
@@ -105,7 +105,7 @@ export function PropertyPanel({
   const nodeType = selectedNode.type as "scene" | "event" | "branch";
 
   return (
-    <aside className="flex h-full w-72 flex-col border-l border-border bg-card">
+    <aside className="flex h-full flex-col bg-card">
       <div className="px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">속성</h2>
       </div>

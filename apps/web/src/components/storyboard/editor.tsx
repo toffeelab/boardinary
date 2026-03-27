@@ -16,6 +16,11 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
+import {
+  Group as PanelGroup,
+  Panel,
+  Separator as PanelResizeHandle,
+} from "react-resizable-panels";
 import type {
   StoryboardContentV1,
   StoryboardNodeData,
@@ -118,6 +123,7 @@ function EditorInner({
 
   // Store
   const {
+    isNodeListOpen,
     selectedNodeId,
     setSelectedNodeId,
     saveStatus,
@@ -389,10 +395,17 @@ function EditorInner({
       </div>
 
       {/* Main editor area */}
-      <div className="flex min-h-0 flex-1">
-        <NodeListPanel nodes={nodes} onNodeSelect={handleNodeSelect} />
+      <PanelGroup orientation="horizontal" className="min-h-0 flex-1">
+        {isNodeListOpen && (
+          <>
+            <Panel defaultSize={20} minSize={15} maxSize={30}>
+              <NodeListPanel nodes={nodes} onNodeSelect={handleNodeSelect} />
+            </Panel>
+            <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-primary" />
+          </>
+        )}
 
-        <div className="min-h-0 flex-1">
+        <Panel defaultSize={60}>
           <Canvas
             nodes={nodes}
             edges={edges}
@@ -403,14 +416,17 @@ function EditorInner({
             onNodeDragStop={handleNodeDragStop}
             onMoveEnd={handleMoveEnd}
           />
-        </div>
+        </Panel>
 
-        <PropertyPanel
-          nodes={nodes}
-          selectedNodeId={selectedNodeId}
-          onNodeDataChange={handleNodeDataChange}
-        />
-      </div>
+        <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-primary" />
+        <Panel defaultSize={20} minSize={15} maxSize={30}>
+          <PropertyPanel
+            nodes={nodes}
+            selectedNodeId={selectedNodeId}
+            onNodeDataChange={handleNodeDataChange}
+          />
+        </Panel>
+      </PanelGroup>
 
       {/* Toolbar */}
       <Toolbar onAddNode={handleAddNode} />
