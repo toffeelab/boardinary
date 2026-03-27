@@ -5,6 +5,7 @@ export interface StoryboardDto {
   updatedBy: string | null;
   name: string;
   description: string | null;
+  /** Runtime: always StoryboardContentV1 after content-migration. Typed as Record for API backward compat. */
   content: Record<string, unknown>;
   contentVersion: number;
   genre: string | null;

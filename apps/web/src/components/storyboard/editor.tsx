@@ -108,6 +108,12 @@ function EditorInner({
     initialReactFlow.current.edges,
   );
 
+  // Stable refs for snapshot capture (avoids callback recreation on every state change)
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  nodesRef.current = nodes;
+  edgesRef.current = edges;
+
   // Store
   const {
     selectedNodeId,
@@ -121,8 +127,11 @@ function EditorInner({
     setContentVersion(initialContentVersion);
   }, [initialContentVersion, setContentVersion]);
 
-  // Viewport ref for auto-save
+  // Viewport ref for auto-save — sync with React Flow's actual viewport on mount
   const viewportRef = useRef<Viewport>({ x: 0, y: 0, zoom: 1 });
+  useEffect(() => {
+    viewportRef.current = reactFlowInstance.getViewport();
+  }, [reactFlowInstance]);
 
   // Track unsaved changes
   const hasUnsavedChanges = useRef(false);
@@ -132,6 +141,7 @@ function EditorInner({
     storyboardId,
     userId,
     viewportRef: viewportRef as React.RefObject<Viewport>,
+    hasUnsavedChangesRef: hasUnsavedChanges as React.RefObject<boolean>,
   });
   const { pushSnapshot, undo, redo } = useUndoRedo();
 
@@ -149,27 +159,17 @@ function EditorInner({
     (changes: NodeChange[]) => {
       const hasRemoval = changes.some((c) => c.type === "remove");
       if (hasRemoval) {
-        // Push snapshot before deletion
-        pushSnapshot(nodes, edges);
+        pushSnapshot(nodesRef.current, edgesRef.current);
       }
       onNodesChange(changes);
-      // Use timeout to get updated state after React Flow processes changes
       if (hasRemoval) {
-        setTimeout(() => {
-          const currentNodes = reactFlowInstance.getNodes();
-          const currentEdges = reactFlowInstance.getEdges();
-          markDirtyAndSave(currentNodes, currentEdges);
-        }, 0);
+        // Read updated state synchronously from React Flow instance after onNodesChange applies
+        const currentNodes = reactFlowInstance.getNodes();
+        const currentEdges = reactFlowInstance.getEdges();
+        markDirtyAndSave(currentNodes, currentEdges);
       }
     },
-    [
-      nodes,
-      edges,
-      onNodesChange,
-      pushSnapshot,
-      reactFlowInstance,
-      markDirtyAndSave,
-    ],
+    [onNodesChange, pushSnapshot, reactFlowInstance, markDirtyAndSave],
   );
 
   // Edge changes handler — intercepts deletions for undo snapshot
@@ -177,47 +177,32 @@ function EditorInner({
     (changes: EdgeChange[]) => {
       const hasRemoval = changes.some((c) => c.type === "remove");
       if (hasRemoval) {
-        pushSnapshot(nodes, edges);
+        pushSnapshot(nodesRef.current, edgesRef.current);
       }
       onEdgesChange(changes);
       if (hasRemoval) {
-        setTimeout(() => {
-          const currentNodes = reactFlowInstance.getNodes();
-          const currentEdges = reactFlowInstance.getEdges();
-          markDirtyAndSave(currentNodes, currentEdges);
-        }, 0);
+        const currentNodes = reactFlowInstance.getNodes();
+        const currentEdges = reactFlowInstance.getEdges();
+        markDirtyAndSave(currentNodes, currentEdges);
       }
     },
-    [
-      nodes,
-      edges,
-      onEdgesChange,
-      pushSnapshot,
-      reactFlowInstance,
-      markDirtyAndSave,
-    ],
+    [onEdgesChange, pushSnapshot, reactFlowInstance, markDirtyAndSave],
   );
 
   // Connect handler
   const handleConnect = useCallback(
     (params: Connection) => {
-      pushSnapshot(nodes, edges);
+      pushSnapshot(nodesRef.current, edgesRef.current);
       setEdges((eds) => {
         const newEdges = addEdge(
           { ...params, type: "labeled", label: "" },
           eds,
         );
-        // Schedule save after state update
-        setTimeout(() => {
-          markDirtyAndSave(
-            reactFlowInstance.getNodes(),
-            reactFlowInstance.getEdges(),
-          );
-        }, 0);
+        markDirtyAndSave(reactFlowInstance.getNodes(), newEdges);
         return newEdges;
       });
     },
-    [nodes, edges, pushSnapshot, setEdges, reactFlowInstance, markDirtyAndSave],
+    [pushSnapshot, setEdges, reactFlowInstance, markDirtyAndSave],
   );
 
   // Selection change handler
@@ -232,13 +217,13 @@ function EditorInner({
   const handleNodeDragStop = useCallback(
     (_event: React.MouseEvent, _node: Node, draggedNodes: Node[]) => {
       if (draggedNodes.length > 0) {
+        pushSnapshot(nodesRef.current, edgesRef.current);
         const currentNodes = reactFlowInstance.getNodes();
         const currentEdges = reactFlowInstance.getEdges();
-        pushSnapshot(nodes, edges);
         markDirtyAndSave(currentNodes, currentEdges);
       }
     },
-    [nodes, edges, pushSnapshot, reactFlowInstance, markDirtyAndSave],
+    [pushSnapshot, reactFlowInstance, markDirtyAndSave],
   );
 
   // Move end — track viewport
@@ -252,7 +237,7 @@ function EditorInner({
   // Add node from toolbar
   const handleAddNode = useCallback(
     (type: "scene" | "event" | "branch") => {
-      pushSnapshot(nodes, edges);
+      pushSnapshot(nodesRef.current, edgesRef.current);
 
       const viewport = reactFlowInstance.getViewport();
       // Calculate center of current viewport
@@ -271,45 +256,35 @@ function EditorInner({
 
       setNodes((nds) => {
         const updated = [...nds, newNode];
-        setTimeout(() => {
-          markDirtyAndSave(
-            reactFlowInstance.getNodes(),
-            reactFlowInstance.getEdges(),
-          );
-        }, 0);
+        markDirtyAndSave(updated, edgesRef.current);
         return updated;
       });
     },
-    [nodes, edges, pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave],
+    [pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave],
   );
 
   // Property panel node data change
   const handleNodeDataChange = useCallback(
     (nodeId: string, data: StoryboardNodeData) => {
-      pushSnapshot(nodes, edges);
-      setNodes((nds) =>
-        nds.map((n) =>
+      pushSnapshot(nodesRef.current, edgesRef.current);
+      setNodes((nds) => {
+        const updated = nds.map((n) =>
           n.id === nodeId
             ? { ...n, data: data as unknown as Record<string, unknown> }
             : n,
-        ),
-      );
-      // Trigger save with updated nodes
-      setTimeout(() => {
-        markDirtyAndSave(
-          reactFlowInstance.getNodes(),
-          reactFlowInstance.getEdges(),
         );
-      }, 0);
+        markDirtyAndSave(updated, edgesRef.current);
+        return updated;
+      });
     },
-    [nodes, edges, pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave],
+    [pushSnapshot, setNodes, markDirtyAndSave],
   );
 
   // Node list panel — focus on node
   const handleNodeSelect = useCallback(
     (nodeId: string) => {
       setSelectedNodeId(nodeId);
-      const node = nodes.find((n) => n.id === nodeId);
+      const node = nodesRef.current.find((n) => n.id === nodeId);
       if (node) {
         reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, {
           zoom: 1,
@@ -317,7 +292,7 @@ function EditorInner({
         });
       }
     },
-    [nodes, setSelectedNodeId, reactFlowInstance],
+    [setSelectedNodeId, reactFlowInstance],
   );
 
   // Keyboard shortcut handlers
@@ -327,7 +302,6 @@ function EditorInner({
     const currentNodes = reactFlowInstance.getNodes();
     const currentEdges = reactFlowInstance.getEdges();
     immediateSave(currentNodes, currentEdges, viewport);
-    hasUnsavedChanges.current = false;
   }, [reactFlowInstance, immediateSave]);
 
   const handleShortcutUndo = useCallback(() => {
@@ -349,10 +323,11 @@ function EditorInner({
   }, [redo, setNodes, setEdges, markDirtyAndSave]);
 
   const handleDuplicate = useCallback(() => {
-    const selectedNodes = nodes.filter((n) => n.selected);
+    const currentNodes = nodesRef.current;
+    const selectedNodes = currentNodes.filter((n) => n.selected);
     if (selectedNodes.length === 0) return;
 
-    pushSnapshot(nodes, edges);
+    pushSnapshot(currentNodes, edgesRef.current);
 
     const newNodes: Node[] = selectedNodes.map((n) => ({
       ...n,
@@ -364,15 +339,10 @@ function EditorInner({
 
     setNodes((nds) => {
       const updated = [...nds, ...newNodes];
-      setTimeout(() => {
-        markDirtyAndSave(
-          reactFlowInstance.getNodes(),
-          reactFlowInstance.getEdges(),
-        );
-      }, 0);
+      markDirtyAndSave(updated, edgesRef.current);
       return updated;
     });
-  }, [nodes, edges, pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave]);
+  }, [pushSnapshot, setNodes, markDirtyAndSave]);
 
   // Wire keyboard shortcuts
   useEditorShortcuts({

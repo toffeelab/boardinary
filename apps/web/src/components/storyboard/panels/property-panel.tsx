@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 
 interface PropertyPanelProps {
   nodes: Node[];
@@ -128,13 +129,12 @@ export function PropertyPanel({
           <Label htmlFor="node-description" className="text-xs">
             설명
           </Label>
-          <textarea
+          <Textarea
             id="node-description"
             value={nodeData.description ?? ""}
             onChange={(e) => handleChange("description", e.target.value)}
             placeholder="노드 설명"
             rows={3}
-            className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 

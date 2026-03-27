@@ -40,12 +40,14 @@ interface UseAutoSaveOptions {
   storyboardId: string;
   userId: string;
   viewportRef: React.RefObject<Viewport>;
+  hasUnsavedChangesRef: React.RefObject<boolean>;
 }
 
 export function useAutoSave({
   storyboardId,
   userId,
   viewportRef,
+  hasUnsavedChangesRef,
 }: UseAutoSaveOptions) {
   const { setSaveStatus, contentVersion, setContentVersion } =
     useEditorStore();
@@ -82,9 +84,10 @@ export function useAutoSave({
       if (result.contentVersion !== undefined) {
         setContentVersion(result.contentVersion);
       }
+      hasUnsavedChangesRef.current = false;
       setSaveStatus("saved");
     },
-    [storyboardId, userId, contentVersion, setSaveStatus, setContentVersion],
+    [storyboardId, userId, contentVersion, setSaveStatus, setContentVersion, hasUnsavedChangesRef],
   );
 
   const debouncedSave = useCallback(

@@ -1,6 +1,6 @@
 "use server";
 
-import { apiClient } from "@/lib/api-client";
+import { apiClient, ApiError } from "@/lib/api-client";
 import type { StoryboardContentV1 } from "@repo/types";
 
 export async function saveStoryboardAction(
@@ -20,10 +20,10 @@ export async function saveStoryboardAction(
     );
     return { contentVersion: result.contentVersion };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Save failed";
-    if (message.includes("modified") || message.includes("conflict")) {
+    if (error instanceof ApiError && error.statusCode === 409) {
       return { error: "conflict" };
     }
+    const message = error instanceof Error ? error.message : "Save failed";
     return { error: message };
   }
 }

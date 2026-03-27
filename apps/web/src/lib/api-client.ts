@@ -3,6 +3,16 @@ import type { ApiErrorResponse } from "@repo/types";
 const API_URL = process.env.API_URL ?? "http://localhost:4001";
 const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET ?? "";
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiClient<T>(
   path: string,
   options: {
@@ -35,10 +45,11 @@ export async function apiClient<T>(
         statusCode: res.status,
         message: `API error: ${res.status}`,
       }));
-      throw new Error(
+      throw new ApiError(
         typeof error?.message === "string"
           ? error.message
           : `API error: ${res.status}`,
+        (error as ApiErrorResponse)?.statusCode ?? res.status,
       );
     }
 
