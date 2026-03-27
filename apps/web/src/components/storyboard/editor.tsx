@@ -124,6 +124,7 @@ function EditorInner({
   // Store
   const {
     isNodeListOpen,
+    layoutPreset,
     selectedNodeId,
     setSelectedNodeId,
     saveStatus,
@@ -395,17 +396,18 @@ function EditorInner({
       </div>
 
       {/* Main editor area */}
-      <PanelGroup orientation="horizontal" className="min-h-0 flex-1">
-        {isNodeListOpen && (
-          <>
-            <Panel defaultSize={20} minSize={15} maxSize={30}>
-              <NodeListPanel nodes={nodes} onNodeSelect={handleNodeSelect} />
-            </Panel>
-            <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-primary" />
-          </>
-        )}
-
-        <Panel defaultSize={60}>
+      {(() => {
+        const nodeListEl = (
+          <NodeListPanel nodes={nodes} onNodeSelect={handleNodeSelect} />
+        );
+        const propertyEl = (
+          <PropertyPanel
+            nodes={nodes}
+            selectedNodeId={selectedNodeId}
+            onNodeDataChange={handleNodeDataChange}
+          />
+        );
+        const canvasEl = (
           <Canvas
             nodes={nodes}
             edges={edges}
@@ -416,17 +418,49 @@ function EditorInner({
             onNodeDragStop={handleNodeDragStop}
             onMoveEnd={handleMoveEnd}
           />
-        </Panel>
+        );
 
-        <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-primary" />
-        <Panel defaultSize={20} minSize={15} maxSize={30}>
-          <PropertyPanel
-            nodes={nodes}
-            selectedNodeId={selectedNodeId}
-            onNodeDataChange={handleNodeDataChange}
-          />
-        </Panel>
-      </PanelGroup>
+        const showNodeList =
+          layoutPreset !== "property-only" && isNodeListOpen;
+
+        // Determine left and right panel contents based on preset
+        let leftPanel: React.ReactNode = null;
+        let rightPanel: React.ReactNode = null;
+
+        if (layoutPreset === "reversed") {
+          // Property on left (always), node list on right (if open)
+          leftPanel = propertyEl;
+          rightPanel = showNodeList ? nodeListEl : null;
+        } else {
+          // "default" or "property-only": node list on left (if shown), property on right
+          leftPanel = showNodeList ? nodeListEl : null;
+          rightPanel = propertyEl;
+        }
+
+        return (
+          <PanelGroup orientation="horizontal" className="min-h-0 flex-1">
+            {leftPanel && (
+              <>
+                <Panel defaultSize={20} minSize={15} maxSize={30}>
+                  {leftPanel}
+                </Panel>
+                <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-primary" />
+              </>
+            )}
+
+            <Panel defaultSize={60}>{canvasEl}</Panel>
+
+            {rightPanel && (
+              <>
+                <PanelResizeHandle className="w-1 bg-border transition-colors hover:bg-primary" />
+                <Panel defaultSize={20} minSize={15} maxSize={30}>
+                  {rightPanel}
+                </Panel>
+              </>
+            )}
+          </PanelGroup>
+        );
+      })()}
 
       {/* Toolbar */}
       <Toolbar onAddNode={handleAddNode} />

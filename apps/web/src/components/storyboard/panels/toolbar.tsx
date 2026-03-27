@@ -1,7 +1,15 @@
 "use client";
 
+import { LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEditorStore } from "@/stores/editor-store";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useEditorStore, type LayoutPreset } from "@/stores/editor-store";
 
 type StoryboardNodeType = "scene" | "event" | "branch";
 
@@ -19,8 +27,15 @@ const ADD_BUTTONS: {
   { type: "branch", label: "+ 분기", color: "#f59e0b" },
 ];
 
+const PRESET_LABELS: Record<LayoutPreset, string> = {
+  default: "기본",
+  reversed: "역배치",
+  "property-only": "속성만",
+};
+
 export function Toolbar({ onAddNode }: ToolbarProps) {
-  const { isNodeListOpen, toggleNodeList } = useEditorStore();
+  const { isNodeListOpen, toggleNodeList, layoutPreset, setLayoutPreset } =
+    useEditorStore();
 
   return (
     <div className="flex items-center gap-2 border-t border-border bg-card px-4 py-2">
@@ -51,6 +66,35 @@ export function Toolbar({ onAddNode }: ToolbarProps) {
           {label}
         </Button>
       ))}
+
+      <div className="mx-2 h-5 w-px bg-border" />
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="sm" className="gap-1.5">
+            <LayoutGrid className="h-4 w-4" />
+            {PRESET_LABELS[layoutPreset]}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuRadioGroup
+            value={layoutPreset}
+            onValueChange={(value) =>
+              setLayoutPreset(value as LayoutPreset)
+            }
+          >
+            <DropdownMenuRadioItem value="default">
+              기본 (목록 좌 / 속성 우)
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="reversed">
+              역배치 (속성 좌 / 목록 우)
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="property-only">
+              속성만 (목록 없음)
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
