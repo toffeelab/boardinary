@@ -218,12 +218,10 @@ function EditorInner({
     (_event: React.MouseEvent, _node: Node, draggedNodes: Node[]) => {
       if (draggedNodes.length > 0) {
         pushSnapshot(nodesRef.current, edgesRef.current);
-        const currentNodes = reactFlowInstance.getNodes();
-        const currentEdges = reactFlowInstance.getEdges();
-        markDirtyAndSave(currentNodes, currentEdges);
+        markDirtyAndSave(nodesRef.current, edgesRef.current);
       }
     },
-    [pushSnapshot, reactFlowInstance, markDirtyAndSave],
+    [pushSnapshot, markDirtyAndSave],
   );
 
   // Move end — track viewport
