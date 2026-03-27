@@ -380,12 +380,114 @@ function EditorInner({
     });
   }, [pushSnapshot, setNodes, markDirtyAndSave]);
 
+  // Group selected nodes
+  const handleGroupNodes = useCallback(() => {
+    const currentNodes = nodesRef.current;
+    const selectedNodes = currentNodes.filter(
+      (n) => n.selected && n.type !== "group",
+    );
+    if (selectedNodes.length < 2) return;
+
+    pushSnapshot(currentNodes, edgesRef.current);
+
+    // Calculate bounding box of selected nodes
+    const padding = 20;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const node of selectedNodes) {
+      const w = node.measured?.width ?? node.width ?? 180;
+      const h = node.measured?.height ?? node.height ?? 80;
+      minX = Math.min(minX, node.position.x);
+      minY = Math.min(minY, node.position.y);
+      maxX = Math.max(maxX, node.position.x + w);
+      maxY = Math.max(maxY, node.position.y + h);
+    }
+
+    const groupId = crypto.randomUUID();
+    const groupPosition = { x: minX - padding, y: minY - padding };
+    const groupWidth = maxX - minX + padding * 2;
+    const groupHeight = maxY - minY + padding * 2;
+
+    const groupNode: Node = {
+      id: groupId,
+      type: "group",
+      position: groupPosition,
+      width: groupWidth,
+      height: groupHeight,
+      style: { width: groupWidth, height: groupHeight },
+      data: { title: "그룹" } as unknown as Record<string, unknown>,
+    };
+
+    setNodes((nds) => {
+      const selectedIds = new Set(selectedNodes.map((n) => n.id));
+      const updated = nds.map((n) => {
+        if (selectedIds.has(n.id)) {
+          return {
+            ...n,
+            parentId: groupId,
+            extent: "parent" as const,
+            position: {
+              x: n.position.x - groupPosition.x,
+              y: n.position.y - groupPosition.y,
+            },
+          };
+        }
+        return n;
+      });
+      // Group node must come before its children
+      const result = [groupNode, ...updated];
+      markDirtyAndSave(result, edgesRef.current);
+      return result;
+    });
+  }, [pushSnapshot, setNodes, markDirtyAndSave]);
+
+  // Ungroup selected group nodes
+  const handleUngroupNodes = useCallback(() => {
+    const currentNodes = nodesRef.current;
+    const selectedGroups = currentNodes.filter(
+      (n) => n.selected && n.type === "group",
+    );
+    if (selectedGroups.length === 0) return;
+
+    pushSnapshot(currentNodes, edgesRef.current);
+
+    const groupIds = new Set(selectedGroups.map((g) => g.id));
+    const groupPositions = new Map(
+      selectedGroups.map((g) => [g.id, g.position]),
+    );
+
+    setNodes((nds) => {
+      const updated = nds
+        .filter((n) => !groupIds.has(n.id))
+        .map((n) => {
+          if (n.parentId && groupIds.has(n.parentId)) {
+            const groupPos = groupPositions.get(n.parentId)!;
+            const { parentId: _parentId, extent: _extent, ...rest } = n;
+            return {
+              ...rest,
+              position: {
+                x: n.position.x + groupPos.x,
+                y: n.position.y + groupPos.y,
+              },
+            };
+          }
+          return n;
+        });
+      markDirtyAndSave(updated, edgesRef.current);
+      return updated;
+    });
+  }, [pushSnapshot, setNodes, markDirtyAndSave]);
+
   // Wire keyboard shortcuts
   useEditorShortcuts({
     onSave: handleShortcutSave,
     onUndo: handleShortcutUndo,
     onRedo: handleShortcutRedo,
     onDuplicate: handleDuplicate,
+    onGroup: handleGroupNodes,
+    onUngroup: handleUngroupNodes,
   });
 
   // Beforeunload warning
