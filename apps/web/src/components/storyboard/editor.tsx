@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlowProvider,
   useReactFlow,
@@ -34,6 +34,11 @@ import { Canvas } from "./canvas";
 import { Toolbar } from "./panels/toolbar";
 import { NodeListPanel } from "./panels/node-list-panel";
 import { PropertyPanel } from "./panels/property-panel";
+import {
+  ContextMenu,
+  type AlignDirection,
+  type DistributeAxis,
+} from "./panels/context-menu";
 
 interface StoryboardEditorProps {
   storyboardId: string;
@@ -490,6 +495,164 @@ function EditorInner({
     onUngroup: handleUngroupNodes,
   });
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent) => {
+      const selectedNodes = nodesRef.current.filter((n) => n.selected);
+      if (selectedNodes.length < 2) return;
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY });
+    },
+    [],
+  );
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // Align selected nodes
+  const handleAlign = useCallback(
+    (direction: AlignDirection) => {
+      const currentNodes = nodesRef.current;
+      const selectedNodes = currentNodes.filter((n) => n.selected);
+      if (selectedNodes.length < 2) return;
+
+      pushSnapshot(currentNodes, edgesRef.current);
+
+      let targetValue: number;
+      if (direction === "left") {
+        targetValue = Math.min(...selectedNodes.map((n) => n.position.x));
+      } else if (direction === "right") {
+        targetValue = Math.max(
+          ...selectedNodes.map(
+            (n) => n.position.x + (n.measured?.width ?? n.width ?? 180),
+          ),
+        );
+      } else if (direction === "top") {
+        targetValue = Math.min(...selectedNodes.map((n) => n.position.y));
+      } else {
+        targetValue = Math.max(
+          ...selectedNodes.map(
+            (n) => n.position.y + (n.measured?.height ?? n.height ?? 80),
+          ),
+        );
+      }
+
+      const selectedIds = new Set(selectedNodes.map((n) => n.id));
+
+      setNodes((nds) => {
+        const updated = nds.map((n) => {
+          if (!selectedIds.has(n.id)) return n;
+          const w = n.measured?.width ?? n.width ?? 180;
+          const h = n.measured?.height ?? n.height ?? 80;
+          if (direction === "left") {
+            return { ...n, position: { ...n.position, x: targetValue } };
+          } else if (direction === "right") {
+            return {
+              ...n,
+              position: { ...n.position, x: targetValue - w },
+            };
+          } else if (direction === "top") {
+            return { ...n, position: { ...n.position, y: targetValue } };
+          } else {
+            return {
+              ...n,
+              position: { ...n.position, y: targetValue - h },
+            };
+          }
+        });
+        markDirtyAndSave(updated, edgesRef.current);
+        return updated;
+      });
+    },
+    [pushSnapshot, setNodes, markDirtyAndSave],
+  );
+
+  // Distribute selected nodes evenly
+  const handleDistribute = useCallback(
+    (axis: DistributeAxis) => {
+      const currentNodes = nodesRef.current;
+      const selectedNodes = currentNodes.filter((n) => n.selected);
+      if (selectedNodes.length < 3) return;
+
+      pushSnapshot(currentNodes, edgesRef.current);
+
+      const selectedIds = new Set(selectedNodes.map((n) => n.id));
+
+      if (axis === "horizontal") {
+        const sorted = [...selectedNodes].sort(
+          (a, b) => a.position.x - b.position.x,
+        );
+        const first = sorted[0]!;
+        const last = sorted[sorted.length - 1]!;
+        const totalSpan =
+          last.position.x +
+          (last.measured?.width ?? last.width ?? 180) -
+          first.position.x;
+        const totalNodeWidth = sorted.reduce(
+          (sum, n) => sum + (n.measured?.width ?? n.width ?? 180),
+          0,
+        );
+        const gap = (totalSpan - totalNodeWidth) / (sorted.length - 1);
+        let currentX = first.position.x;
+        const positionMap = new Map<string, number>();
+        for (const node of sorted) {
+          positionMap.set(node.id, currentX);
+          currentX += (node.measured?.width ?? node.width ?? 180) + gap;
+        }
+
+        setNodes((nds) => {
+          const updated = nds.map((n) => {
+            if (!selectedIds.has(n.id)) return n;
+            const newX = positionMap.get(n.id);
+            if (newX == null) return n;
+            return { ...n, position: { ...n.position, x: newX } };
+          });
+          markDirtyAndSave(updated, edgesRef.current);
+          return updated;
+        });
+      } else {
+        const sorted = [...selectedNodes].sort(
+          (a, b) => a.position.y - b.position.y,
+        );
+        const first = sorted[0]!;
+        const last = sorted[sorted.length - 1]!;
+        const totalSpan =
+          last.position.y +
+          (last.measured?.height ?? last.height ?? 80) -
+          first.position.y;
+        const totalNodeHeight = sorted.reduce(
+          (sum, n) => sum + (n.measured?.height ?? n.height ?? 80),
+          0,
+        );
+        const gap = (totalSpan - totalNodeHeight) / (sorted.length - 1);
+        let currentY = first.position.y;
+        const positionMap = new Map<string, number>();
+        for (const node of sorted) {
+          positionMap.set(node.id, currentY);
+          currentY += (node.measured?.height ?? node.height ?? 80) + gap;
+        }
+
+        setNodes((nds) => {
+          const updated = nds.map((n) => {
+            if (!selectedIds.has(n.id)) return n;
+            const newY = positionMap.get(n.id);
+            if (newY == null) return n;
+            return { ...n, position: { ...n.position, y: newY } };
+          });
+          markDirtyAndSave(updated, edgesRef.current);
+          return updated;
+        });
+      }
+    },
+    [pushSnapshot, setNodes, markDirtyAndSave],
+  );
+
   // Beforeunload warning
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
@@ -543,17 +706,28 @@ function EditorInner({
           />
         );
         const canvasEl = (
-          <Canvas
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            onConnect={handleConnect}
-            onSelectionChange={handleSelectionChange}
-            onNodeDragStop={handleNodeDragStop}
-            onMoveEnd={handleMoveEnd}
-            onNodeDrop={handleNodeDrop}
-          />
+          <div className="relative h-full w-full" onContextMenu={handleContextMenu}>
+            <Canvas
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={handleNodesChange}
+              onEdgesChange={handleEdgesChange}
+              onConnect={handleConnect}
+              onSelectionChange={handleSelectionChange}
+              onNodeDragStop={handleNodeDragStop}
+              onMoveEnd={handleMoveEnd}
+              onNodeDrop={handleNodeDrop}
+            />
+            {contextMenu && (
+              <ContextMenu
+                x={contextMenu.x}
+                y={contextMenu.y}
+                onAlign={handleAlign}
+                onDistribute={handleDistribute}
+                onClose={handleCloseContextMenu}
+              />
+            )}
+          </div>
         );
 
         const showNodeList =
