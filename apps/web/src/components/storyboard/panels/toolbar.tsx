@@ -34,8 +34,14 @@ const PRESET_LABELS: Record<LayoutPreset, string> = {
 };
 
 export function Toolbar({ onAddNode }: ToolbarProps) {
-  const { isNodeListOpen, toggleNodeList, layoutPreset, setLayoutPreset } =
-    useEditorStore();
+  const {
+    isNodeListOpen,
+    toggleNodeList,
+    isPropertyPanelOpen,
+    togglePropertyPanel,
+    layoutPreset,
+    setLayoutPreset,
+  } = useEditorStore();
 
   return (
     <div className="flex items-center gap-2 border-t border-border bg-card px-4 py-2">
@@ -46,6 +52,15 @@ export function Toolbar({ onAddNode }: ToolbarProps) {
         onClick={toggleNodeList}
       >
         {isNodeListOpen ? "목록 닫기" : "목록 열기"}
+      </Button>
+
+      <Button
+        type="button"
+        variant={isPropertyPanelOpen ? "secondary" : "ghost"}
+        size="sm"
+        onClick={togglePropertyPanel}
+      >
+        {isPropertyPanelOpen ? "속성 닫기" : "속성 열기"}
       </Button>
 
       <div className="mx-2 h-5 w-px bg-border" />

@@ -17,10 +17,9 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 import {
-  Group as PanelGroup,
-  Panel,
-  Separator as PanelResizeHandle,
-} from "react-resizable-panels";
+  PanelLeftOpen,
+  PanelRightOpen,
+} from "lucide-react";
 import type {
   StoryboardContentV1,
   StoryboardNodeData,
@@ -132,6 +131,9 @@ function EditorInner({
   // Store
   const {
     isNodeListOpen,
+    toggleNodeList,
+    isPropertyPanelOpen,
+    togglePropertyPanel,
     layoutPreset,
     selectedNodeId,
     setSelectedNodeId,
@@ -706,80 +708,93 @@ function EditorInner({
             onNodeDataChange={handleNodeDataChange}
           />
         );
-        const canvasEl = (
-          <div className="relative h-full w-full" onContextMenu={handleContextMenu}>
-            <Canvas
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={handleNodesChange}
-              onEdgesChange={handleEdgesChange}
-              onConnect={handleConnect}
-              onSelectionChange={handleSelectionChange}
-              onNodeDragStop={handleNodeDragStop}
-              onMoveEnd={handleMoveEnd}
-              onNodeDrop={handleNodeDrop}
-            />
-            {contextMenu && (
-              <ContextMenu
-                x={contextMenu.x}
-                y={contextMenu.y}
-                onAlign={handleAlign}
-                onDistribute={handleDistribute}
-                onClose={handleCloseContextMenu}
-              />
-            )}
-          </div>
-        );
 
         const showNodeList =
           layoutPreset !== "property-only" && isNodeListOpen;
+        const showProperty = isPropertyPanelOpen;
 
         // Determine left and right panel contents based on preset
         let leftPanel: React.ReactNode = null;
         let rightPanel: React.ReactNode = null;
+        let leftCollapsed = false;
+        let rightCollapsed = false;
+
+        const isPropertyOnly = layoutPreset === "property-only";
 
         if (layoutPreset === "reversed") {
-          // Property on left (always), node list on right (if open)
-          leftPanel = propertyEl;
+          leftPanel = showProperty ? propertyEl : null;
           rightPanel = showNodeList ? nodeListEl : null;
+          leftCollapsed = !showProperty;
+          rightCollapsed = !isNodeListOpen;
         } else {
-          // "default" or "property-only": node list on left (if shown), property on right
           leftPanel = showNodeList ? nodeListEl : null;
-          rightPanel = propertyEl;
+          rightPanel = showProperty ? propertyEl : null;
+          leftCollapsed = !isPropertyOnly && !isNodeListOpen;
+          rightCollapsed = !showProperty;
         }
 
         return (
-          <PanelGroup orientation="horizontal" className="min-h-0 flex-1">
+          <div className="flex min-h-0 flex-1">
+            {/* Left panel */}
             {leftPanel && (
-              <>
-                <Panel
-                  defaultSize={20}
-                  minSize={15}
-                  maxSize={35}
-                  className="overflow-hidden min-w-[180px]"
-                >
-                  {leftPanel}
-                </Panel>
-                <PanelResizeHandle className="w-1 shrink-0 bg-border transition-colors hover:bg-primary cursor-col-resize" />
-              </>
+              <aside className={`shrink-0 overflow-hidden border-r ${layoutPreset === "reversed" ? "w-72" : "w-60"}`}>
+                {leftPanel}
+              </aside>
             )}
 
-            <Panel defaultSize={60}>{canvasEl}</Panel>
+            {/* Canvas - fills remaining space */}
+            <div className="relative flex-1">
+              {leftCollapsed && (
+                <button
+                  type="button"
+                  className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-md border bg-card p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+                  onClick={layoutPreset === "reversed" ? togglePropertyPanel : toggleNodeList}
+                  aria-label={layoutPreset === "reversed" ? "속성 열기" : "목록 열기"}
+                >
+                  <PanelLeftOpen className="h-4 w-4" />
+                </button>
+              )}
+              <div className="h-full w-full" onContextMenu={handleContextMenu}>
+                <Canvas
+                  nodes={nodes}
+                  edges={edges}
+                  onNodesChange={handleNodesChange}
+                  onEdgesChange={handleEdgesChange}
+                  onConnect={handleConnect}
+                  onSelectionChange={handleSelectionChange}
+                  onNodeDragStop={handleNodeDragStop}
+                  onMoveEnd={handleMoveEnd}
+                  onNodeDrop={handleNodeDrop}
+                />
+                {contextMenu && (
+                  <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onAlign={handleAlign}
+                    onDistribute={handleDistribute}
+                    onClose={handleCloseContextMenu}
+                  />
+                )}
+              </div>
+              {rightCollapsed && (
+                <button
+                  type="button"
+                  className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-md border bg-card p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+                  onClick={layoutPreset === "reversed" ? toggleNodeList : togglePropertyPanel}
+                  aria-label={layoutPreset === "reversed" ? "목록 열기" : "속성 열기"}
+                >
+                  <PanelRightOpen className="h-4 w-4" />
+                </button>
+              )}
+            </div>
 
+            {/* Right panel */}
             {rightPanel && (
-              <>
-                <PanelResizeHandle className="w-1 shrink-0 bg-border transition-colors hover:bg-primary cursor-col-resize" />
-                <Panel
-                  defaultSize={20}
-                  minSize={15}
-                  maxSize={35}
-                  className="overflow-hidden min-w-[180px]"
-                >
-                  {rightPanel}
-                </Panel>
-              </>
+              <aside className={`shrink-0 overflow-hidden border-l ${layoutPreset === "reversed" ? "w-60" : "w-72"}`}>
+                {rightPanel}
+              </aside>
             )}
-          </PanelGroup>
+          </div>
         );
       })()}
 

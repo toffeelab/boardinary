@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { Node } from "@xyflow/react";
+import { PanelLeftClose } from "lucide-react";
 import type { StoryboardNodeData } from "@repo/types";
 import { useEditorStore } from "@/stores/editor-store";
 import { Separator } from "@/components/ui/separator";
@@ -20,7 +21,7 @@ const NODE_TYPE_CONFIG = {
 type NodeType = keyof typeof NODE_TYPE_CONFIG;
 
 export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
-  const { selectedNodeId } = useEditorStore();
+  const { selectedNodeId, toggleNodeList } = useEditorStore();
 
   const groupedNodes = useMemo(() => {
     const groups: Record<NodeType, Node[]> = {
@@ -41,10 +42,18 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
 
   return (
     <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
-      <div className="px-4 py-3">
+      <div className="flex items-center justify-between px-4 py-3">
         <h2 className="truncate text-sm font-semibold text-foreground">
           노드 목록
         </h2>
+        <button
+          type="button"
+          onClick={toggleNodeList}
+          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="목록 닫기"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
       </div>
       <Separator />
       <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-2">

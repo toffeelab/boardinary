@@ -2,7 +2,9 @@
 
 import { useCallback, useMemo } from "react";
 import type { Node } from "@xyflow/react";
+import { PanelRightClose } from "lucide-react";
 import type { StoryboardNodeData } from "@repo/types";
+import { useEditorStore } from "@/stores/editor-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +33,8 @@ export function PropertyPanel({
   selectedNodeId,
   onNodeDataChange,
 }: PropertyPanelProps) {
+  const { togglePropertyPanel } = useEditorStore();
+
   const selectedNode = useMemo(
     () => (selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null),
     [nodes, selectedNodeId],
@@ -91,10 +95,18 @@ export function PropertyPanel({
   if (!selectedNode || !nodeData) {
     return (
       <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
-        <div className="px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3">
           <h2 className="truncate text-sm font-semibold text-foreground">
             속성
           </h2>
+          <button
+            type="button"
+            onClick={togglePropertyPanel}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="속성 닫기"
+          >
+            <PanelRightClose className="h-4 w-4" />
+          </button>
         </div>
         <Separator />
         <div className="flex min-w-0 flex-1 items-center justify-center">

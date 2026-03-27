@@ -12,6 +12,7 @@ export type LayoutPreset = "default" | "reversed" | "property-only";
 interface EditorState {
   // UI 상태
   isNodeListOpen: boolean;
+  isPropertyPanelOpen: boolean;
   selectedNodeId: string | null;
   saveStatus: "idle" | "saving" | "saved" | "error" | "conflict";
   contentVersion: number;
@@ -25,6 +26,7 @@ interface EditorState {
 
   // 액션
   toggleNodeList: () => void;
+  togglePropertyPanel: () => void;
   setSelectedNodeId: (id: string | null) => void;
   setSaveStatus: (status: EditorState["saveStatus"]) => void;
   setContentVersion: (version: number) => void;
@@ -43,6 +45,7 @@ export const useEditorStore = create<EditorState>()(
   persist(
     (set, get) => ({
       isNodeListOpen: true,
+      isPropertyPanelOpen: true,
       selectedNodeId: null,
       saveStatus: "idle",
       contentVersion: 0,
@@ -54,6 +57,8 @@ export const useEditorStore = create<EditorState>()(
 
       toggleNodeList: () =>
         set((s) => ({ isNodeListOpen: !s.isNodeListOpen })),
+      togglePropertyPanel: () =>
+        set((s) => ({ isPropertyPanelOpen: !s.isPropertyPanelOpen })),
       setSelectedNodeId: (id) => set({ selectedNodeId: id }),
       setSaveStatus: (status) => set({ saveStatus: status }),
       setContentVersion: (version) => set({ contentVersion: version }),
@@ -93,6 +98,7 @@ export const useEditorStore = create<EditorState>()(
       name: "boardinary-editor",
       partialize: (state) => ({
         isNodeListOpen: state.isNodeListOpen,
+        isPropertyPanelOpen: state.isPropertyPanelOpen,
         layoutPreset: state.layoutPreset,
       }),
     },
