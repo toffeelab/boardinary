@@ -760,7 +760,7 @@ function EditorInner({
                 >
                   {leftPanel}
                 </Panel>
-                <PanelResizeHandle className="w-1.5 bg-border transition-colors hover:bg-primary cursor-col-resize" />
+                <PanelResizeHandle className="w-1 shrink-0 bg-border transition-colors hover:bg-primary cursor-col-resize" />
               </>
             )}
 
@@ -768,7 +768,7 @@ function EditorInner({
 
             {rightPanel && (
               <>
-                <PanelResizeHandle className="w-1.5 bg-border transition-colors hover:bg-primary cursor-col-resize" />
+                <PanelResizeHandle className="w-1 shrink-0 bg-border transition-colors hover:bg-primary cursor-col-resize" />
                 <Panel
                   defaultSize={20}
                   minSize={15}
