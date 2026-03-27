@@ -7,6 +7,8 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
   type Node,
   type Edge,
   type Connection,
@@ -163,13 +165,12 @@ function EditorInner({
       }
       onNodesChange(changes);
       if (hasRemoval) {
-        // Read updated state synchronously from React Flow instance after onNodesChange applies
-        const currentNodes = reactFlowInstance.getNodes();
-        const currentEdges = reactFlowInstance.getEdges();
-        markDirtyAndSave(currentNodes, currentEdges);
+        // Compute resulting state directly to avoid timing issues with React Flow internal store
+        const updatedNodes = applyNodeChanges(changes, nodesRef.current);
+        markDirtyAndSave(updatedNodes, edgesRef.current);
       }
     },
-    [onNodesChange, pushSnapshot, reactFlowInstance, markDirtyAndSave],
+    [onNodesChange, pushSnapshot, markDirtyAndSave],
   );
 
   // Edge changes handler — intercepts deletions for undo snapshot
@@ -181,12 +182,11 @@ function EditorInner({
       }
       onEdgesChange(changes);
       if (hasRemoval) {
-        const currentNodes = reactFlowInstance.getNodes();
-        const currentEdges = reactFlowInstance.getEdges();
-        markDirtyAndSave(currentNodes, currentEdges);
+        const updatedEdges = applyEdgeChanges(changes, edgesRef.current);
+        markDirtyAndSave(nodesRef.current, updatedEdges);
       }
     },
-    [onEdgesChange, pushSnapshot, reactFlowInstance, markDirtyAndSave],
+    [onEdgesChange, pushSnapshot, markDirtyAndSave],
   );
 
   // Connect handler

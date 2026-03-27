@@ -49,7 +49,7 @@ export async function apiClient<T>(
         typeof error?.message === "string"
           ? error.message
           : `API error: ${res.status}`,
-        (error as ApiErrorResponse)?.statusCode ?? res.status,
+        res.status,
       );
     }
 
