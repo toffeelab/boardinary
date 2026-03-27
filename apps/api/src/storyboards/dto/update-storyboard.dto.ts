@@ -1,5 +1,15 @@
-import { IsString, IsOptional, IsArray, MaxLength } from "class-validator";
-import type { UpdateStoryboardDto as IUpdateStoryboardDto } from "@repo/types";
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsObject,
+  IsInt,
+  MaxLength,
+} from "class-validator";
+import type {
+  UpdateStoryboardDto as IUpdateStoryboardDto,
+  StoryboardContentV1,
+} from "@repo/types";
 
 export class UpdateStoryboardDto implements IUpdateStoryboardDto {
   @IsOptional()
@@ -21,4 +31,12 @@ export class UpdateStoryboardDto implements IUpdateStoryboardDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @IsOptional()
+  @IsObject()
+  content?: StoryboardContentV1;
+
+  @IsOptional()
+  @IsInt()
+  contentVersion?: number;
 }
