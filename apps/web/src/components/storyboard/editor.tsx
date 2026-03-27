@@ -74,6 +74,9 @@ function contentToReactFlow(content: StoryboardContentV1): {
     type: n.type,
     position: n.position,
     data: n.data as unknown as Record<string, unknown>,
+    ...(n.width != null ? { width: n.width } : {}),
+    ...(n.height != null ? { height: n.height } : {}),
+    ...(n.parentId ? { parentId: n.parentId, extent: "parent" as const } : {}),
   }));
   const edges: Edge[] = content.edges.map((e) => ({
     id: e.id,
@@ -163,15 +166,18 @@ function EditorInner({
     [debouncedSave],
   );
 
-  // Node changes handler — intercepts deletions for undo snapshot
+  // Node changes handler — intercepts deletions and dimension changes for undo snapshot
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const hasRemoval = changes.some((c) => c.type === "remove");
-      if (hasRemoval) {
+      const hasDimensions = changes.some(
+        (c) => c.type === "dimensions" && c.resizing === false,
+      );
+      if (hasRemoval || hasDimensions) {
         pushSnapshot(nodesRef.current, edgesRef.current);
       }
       onNodesChange(changes);
-      if (hasRemoval) {
+      if (hasRemoval || hasDimensions) {
         // Compute resulting state directly to avoid timing issues with React Flow internal store
         const updatedNodes = applyNodeChanges(changes, nodesRef.current);
         markDirtyAndSave(updatedNodes, edgesRef.current);
