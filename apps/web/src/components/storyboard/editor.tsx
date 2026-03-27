@@ -469,9 +469,10 @@ function EditorInner({
         .map((n) => {
           if (n.parentId && groupIds.has(n.parentId)) {
             const groupPos = groupPositions.get(n.parentId)!;
-            const { parentId: _parentId, extent: _extent, ...rest } = n;
             return {
-              ...rest,
+              ...n,
+              parentId: undefined,
+              extent: undefined,
               position: {
                 x: n.position.x + groupPos.x,
                 y: n.position.y + groupPos.y,
