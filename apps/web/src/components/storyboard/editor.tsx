@@ -268,6 +268,33 @@ function EditorInner({
     [pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave],
   );
 
+  // Add node via drag-and-drop on canvas
+  const handleNodeDrop = useCallback(
+    (
+      type: "scene" | "event" | "branch",
+      position: { x: number; y: number },
+    ) => {
+      pushSnapshot(nodesRef.current, edgesRef.current);
+
+      const newNode: Node = {
+        id: crypto.randomUUID(),
+        type,
+        position,
+        data: createDefaultNodeData(type) as unknown as Record<
+          string,
+          unknown
+        >,
+      };
+
+      setNodes((nds) => {
+        const updated = [...nds, newNode];
+        markDirtyAndSave(updated, edgesRef.current);
+        return updated;
+      });
+    },
+    [pushSnapshot, setNodes, markDirtyAndSave],
+  );
+
   // Property panel node data change
   const handleNodeDataChange = useCallback(
     (nodeId: string, data: StoryboardNodeData) => {
@@ -417,6 +444,7 @@ function EditorInner({
             onSelectionChange={handleSelectionChange}
             onNodeDragStop={handleNodeDragStop}
             onMoveEnd={handleMoveEnd}
+            onNodeDrop={handleNodeDrop}
           />
         );
 

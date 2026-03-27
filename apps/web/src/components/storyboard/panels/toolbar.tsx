@@ -56,6 +56,14 @@ export function Toolbar({ onAddNode }: ToolbarProps) {
           type="button"
           variant="outline"
           size="sm"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData(
+              "application/boardinary-node",
+              type,
+            );
+            e.dataTransfer.effectAllowed = "move";
+          }}
           onClick={() => onAddNode(type)}
           className="gap-1.5"
         >
