@@ -1,0 +1,45 @@
+{
+  "lastUpdated": "2026-03-30",
+  "phases": [
+    {
+      "id": "phase-0",
+      "name": "Foundation",
+      "status": "completed",
+      "features": [
+        { "id": "p0-auth", "name": "Auth.js 인증 (Google/GitHub/Magic Link)", "passes": true },
+        { "id": "p0-db", "name": "Drizzle ORM + PostgreSQL 스키마", "passes": true },
+        { "id": "p0-dashboard", "name": "대시보드 기본 구조", "passes": true },
+        { "id": "p0-org", "name": "조직/프로젝트 CRUD", "passes": true }
+      ]
+    },
+    {
+      "id": "phase-1",
+      "name": "Core Editor",
+      "status": "completed",
+      "features": [
+        { "id": "p1-canvas", "name": "ReactFlow 캔버스 + 기본 노드 4종", "passes": true },
+        { "id": "p1-save", "name": "자동 저장 (Auto-save)", "passes": true },
+        { "id": "p1-undo", "name": "Undo/Redo", "passes": true },
+        { "id": "p1-property", "name": "속성 패널", "passes": true }
+      ]
+    },
+    {
+      "id": "phase-2a",
+      "name": "Templates + Custom Nodes",
+      "status": "completed",
+      "features": [
+        { "id": "p2a-nodes", "name": "대사/조건/메모 노드 3종", "passes": true },
+        { "id": "p2a-templates", "name": "장르 템플릿 3종 (RPG/액션/퍼즐)", "passes": true }
+      ]
+    },
+    {
+      "id": "phase-2b",
+      "name": "User Templates + Components",
+      "status": "planned",
+      "features": [
+        { "id": "p2b-custom-templates", "name": "사용자 커스텀 템플릿 저장/로드", "passes": false },
+        { "id": "p2b-components", "name": "컴포넌트 라이브러리", "passes": false }
+      ]
+    }
+  ]
+}
