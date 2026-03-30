@@ -35,8 +35,8 @@ function BranchNodeComponent({ data, selected }: NodeProps) {
       {choices.length > 0 && (
         <div className="mt-2 space-y-2">
           {choices.map((choice, index) => (
-            <div key={choice.id} className="flex items-center">
-              <span className="text-xs text-muted-foreground truncate flex-1">
+            <div key={choice.id} className="relative flex items-center">
+              <span className="text-xs text-muted-foreground truncate">
                 {choice.label || `선택지 ${index + 1}`}
               </span>
               <Handle
@@ -44,6 +44,7 @@ function BranchNodeComponent({ data, selected }: NodeProps) {
                 position={Position.Right}
                 id={choice.id}
                 className="bg-amber-500! w-3! h-3!"
+                style={{ position: "absolute", right: -20, top: "50%", transform: "translateY(-50%)" }}
               />
             </div>
           ))}
