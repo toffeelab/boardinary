@@ -1,4 +1,7 @@
-import type { StoryboardContentV1 } from "@repo/types";
+import type {
+  StoryboardContentV1,
+  StoryboardNode,
+} from "@repo/types";
 
 const EMPTY_CONTENT: StoryboardContentV1 = {
   version: 1,
@@ -6,6 +9,28 @@ const EMPTY_CONTENT: StoryboardContentV1 = {
   nodes: [],
   edges: [],
 };
+
+const VALID_NODE_TYPES = new Set(["scene", "event", "branch", "group"]);
+
+/** Sanitize a single node, ensuring new optional fields are valid */
+function sanitizeNode(raw: Record<string, unknown>): StoryboardNode | null {
+  if (!raw.id || !raw.type || !raw.position || !raw.data) return null;
+  if (!VALID_NODE_TYPES.has(raw.type as string)) return null;
+
+  const node: StoryboardNode = {
+    id: raw.id as string,
+    type: raw.type as StoryboardNode["type"],
+    position: raw.position as { x: number; y: number },
+    data: raw.data as StoryboardNode["data"],
+  };
+
+  // Preserve optional fields when present
+  if (typeof raw.width === "number") node.width = raw.width;
+  if (typeof raw.height === "number") node.height = raw.height;
+  if (typeof raw.parentId === "string") node.parentId = raw.parentId;
+
+  return node;
+}
 
 export function migrateContent(raw: unknown): StoryboardContentV1 {
   if (!raw || typeof raw !== "object") return EMPTY_CONTENT;
@@ -17,13 +42,16 @@ export function migrateContent(raw: unknown): StoryboardContentV1 {
 
   // version 1 검증
   if (content.version === 1) {
+    const rawNodes = Array.isArray(content.nodes) ? content.nodes : [];
+    const nodes = rawNodes
+      .map((n: unknown) => sanitizeNode(n as Record<string, unknown>))
+      .filter((n): n is StoryboardNode => n !== null);
+
     return {
       version: 1,
       viewport: (content.viewport as StoryboardContentV1["viewport"]) ??
         EMPTY_CONTENT.viewport,
-      nodes: (Array.isArray(content.nodes)
-        ? content.nodes
-        : []) as StoryboardContentV1["nodes"],
+      nodes,
       edges: (Array.isArray(content.edges)
         ? content.edges
         : []) as StoryboardContentV1["edges"],

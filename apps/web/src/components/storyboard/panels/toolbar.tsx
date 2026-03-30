@@ -1,7 +1,15 @@
 "use client";
 
+import { LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEditorStore } from "@/stores/editor-store";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useEditorStore, type LayoutPreset } from "@/stores/editor-store";
 
 type StoryboardNodeType = "scene" | "event" | "branch";
 
@@ -19,8 +27,21 @@ const ADD_BUTTONS: {
   { type: "branch", label: "+ 분기", color: "#f59e0b" },
 ];
 
+const PRESET_LABELS: Record<LayoutPreset, string> = {
+  default: "기본",
+  reversed: "역배치",
+  "property-only": "속성만",
+};
+
 export function Toolbar({ onAddNode }: ToolbarProps) {
-  const { isNodeListOpen, toggleNodeList } = useEditorStore();
+  const {
+    isNodeListOpen,
+    toggleNodeList,
+    isPropertyPanelOpen,
+    togglePropertyPanel,
+    layoutPreset,
+    setLayoutPreset,
+  } = useEditorStore();
 
   return (
     <div className="flex items-center gap-2 border-t border-border bg-card px-4 py-2">
@@ -29,8 +50,19 @@ export function Toolbar({ onAddNode }: ToolbarProps) {
         variant={isNodeListOpen ? "secondary" : "ghost"}
         size="sm"
         onClick={toggleNodeList}
+        disabled={layoutPreset === "property-only"}
+        title={layoutPreset === "property-only" ? "속성만 레이아웃에서는 목록을 사용할 수 없습니다" : undefined}
       >
         {isNodeListOpen ? "목록 닫기" : "목록 열기"}
+      </Button>
+
+      <Button
+        type="button"
+        variant={isPropertyPanelOpen ? "secondary" : "ghost"}
+        size="sm"
+        onClick={togglePropertyPanel}
+      >
+        {isPropertyPanelOpen ? "속성 닫기" : "속성 열기"}
       </Button>
 
       <div className="mx-2 h-5 w-px bg-border" />
@@ -41,6 +73,14 @@ export function Toolbar({ onAddNode }: ToolbarProps) {
           type="button"
           variant="outline"
           size="sm"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData(
+              "application/boardinary-node",
+              type,
+            );
+            e.dataTransfer.effectAllowed = "move";
+          }}
           onClick={() => onAddNode(type)}
           className="gap-1.5"
         >
@@ -51,6 +91,35 @@ export function Toolbar({ onAddNode }: ToolbarProps) {
           {label}
         </Button>
       ))}
+
+      <div className="mx-2 h-5 w-px bg-border" />
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="sm" className="gap-1.5">
+            <LayoutGrid className="h-4 w-4" />
+            {PRESET_LABELS[layoutPreset]}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuRadioGroup
+            value={layoutPreset}
+            onValueChange={(value) =>
+              setLayoutPreset(value as LayoutPreset)
+            }
+          >
+            <DropdownMenuRadioItem value="default">
+              기본 (목록 좌 / 속성 우)
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="reversed">
+              역배치 (속성 좌 / 목록 우)
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="property-only">
+              속성만 (목록 없음)
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlowProvider,
   useReactFlow,
@@ -16,6 +16,10 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
+import {
+  PanelLeftOpen,
+  PanelRightOpen,
+} from "lucide-react";
 import type {
   StoryboardContentV1,
   StoryboardNodeData,
@@ -29,6 +33,11 @@ import { Canvas } from "./canvas";
 import { Toolbar } from "./panels/toolbar";
 import { NodeListPanel } from "./panels/node-list-panel";
 import { PropertyPanel } from "./panels/property-panel";
+import {
+  ContextMenu,
+  type AlignDirection,
+  type DistributeAxis,
+} from "./panels/context-menu";
 
 interface StoryboardEditorProps {
   storyboardId: string;
@@ -69,6 +78,9 @@ function contentToReactFlow(content: StoryboardContentV1): {
     type: n.type,
     position: n.position,
     data: n.data as unknown as Record<string, unknown>,
+    ...(n.width != null ? { width: n.width } : {}),
+    ...(n.height != null ? { height: n.height } : {}),
+    ...(n.parentId ? { parentId: n.parentId, extent: "parent" as const } : {}),
   }));
   const edges: Edge[] = content.edges.map((e) => ({
     id: e.id,
@@ -118,6 +130,11 @@ function EditorInner({
 
   // Store
   const {
+    isNodeListOpen,
+    toggleNodeList,
+    isPropertyPanelOpen,
+    togglePropertyPanel,
+    layoutPreset,
     selectedNodeId,
     setSelectedNodeId,
     saveStatus,
@@ -156,15 +173,18 @@ function EditorInner({
     [debouncedSave],
   );
 
-  // Node changes handler — intercepts deletions for undo snapshot
+  // Node changes handler — intercepts deletions and dimension changes for undo snapshot
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const hasRemoval = changes.some((c) => c.type === "remove");
-      if (hasRemoval) {
+      const hasDimensions = changes.some(
+        (c) => c.type === "dimensions" && c.resizing === false,
+      );
+      if (hasRemoval || hasDimensions) {
         pushSnapshot(nodesRef.current, edgesRef.current);
       }
       onNodesChange(changes);
-      if (hasRemoval) {
+      if (hasRemoval || hasDimensions) {
         // Compute resulting state directly to avoid timing issues with React Flow internal store
         const updatedNodes = applyNodeChanges(changes, nodesRef.current);
         markDirtyAndSave(updatedNodes, edgesRef.current);
@@ -209,6 +229,12 @@ function EditorInner({
   const handleSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[] }) => {
       setSelectedNodeId(selectedNodes[0]?.id ?? null);
+      // Sync selection state to nodesRef so group/align/distribute read fresh data
+      const selectedIds = new Set(selectedNodes.map((n) => n.id));
+      nodesRef.current = nodesRef.current.map((n) => ({
+        ...n,
+        selected: selectedIds.has(n.id),
+      }));
     },
     [setSelectedNodeId],
   );
@@ -261,6 +287,33 @@ function EditorInner({
     [pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave],
   );
 
+  // Add node via drag-and-drop on canvas
+  const handleNodeDrop = useCallback(
+    (
+      type: "scene" | "event" | "branch",
+      position: { x: number; y: number },
+    ) => {
+      pushSnapshot(nodesRef.current, edgesRef.current);
+
+      const newNode: Node = {
+        id: crypto.randomUUID(),
+        type,
+        position,
+        data: createDefaultNodeData(type) as unknown as Record<
+          string,
+          unknown
+        >,
+      };
+
+      setNodes((nds) => {
+        const updated = [...nds, newNode];
+        markDirtyAndSave(updated, edgesRef.current);
+        return updated;
+      });
+    },
+    [pushSnapshot, setNodes, markDirtyAndSave],
+  );
+
   // Property panel node data change
   const handleNodeDataChange = useCallback(
     (nodeId: string, data: StoryboardNodeData) => {
@@ -305,6 +358,9 @@ function EditorInner({
     if (snapshot) {
       setNodes(snapshot.nodes);
       setEdges(snapshot.edges);
+      // Explicitly sync refs to avoid race between React state and ref reads
+      nodesRef.current = snapshot.nodes;
+      edgesRef.current = snapshot.edges;
       markDirtyAndSave(snapshot.nodes, snapshot.edges);
     }
   }, [undo, setNodes, setEdges, markDirtyAndSave]);
@@ -314,6 +370,9 @@ function EditorInner({
     if (snapshot) {
       setNodes(snapshot.nodes);
       setEdges(snapshot.edges);
+      // Explicitly sync refs to avoid race between React state and ref reads
+      nodesRef.current = snapshot.nodes;
+      edgesRef.current = snapshot.edges;
       markDirtyAndSave(snapshot.nodes, snapshot.edges);
     }
   }, [redo, setNodes, setEdges, markDirtyAndSave]);
@@ -340,13 +399,274 @@ function EditorInner({
     });
   }, [pushSnapshot, setNodes, markDirtyAndSave]);
 
+  // Group selected nodes
+  const handleGroupNodes = useCallback(() => {
+    const currentNodes = nodesRef.current;
+    const selectedNodes = currentNodes.filter(
+      (n) => n.selected && n.type !== "group",
+    );
+    if (selectedNodes.length < 2) return;
+
+    pushSnapshot(currentNodes, edgesRef.current);
+
+    // Calculate bounding box of selected nodes
+    const padding = 20;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const node of selectedNodes) {
+      const w = node.measured?.width ?? node.width ?? 180;
+      const h = node.measured?.height ?? node.height ?? 80;
+      minX = Math.min(minX, node.position.x);
+      minY = Math.min(minY, node.position.y);
+      maxX = Math.max(maxX, node.position.x + w);
+      maxY = Math.max(maxY, node.position.y + h);
+    }
+
+    const groupId = crypto.randomUUID();
+    const groupPosition = { x: minX - padding, y: minY - padding };
+    const groupWidth = maxX - minX + padding * 2;
+    const groupHeight = maxY - minY + padding * 2;
+
+    const groupNode: Node = {
+      id: groupId,
+      type: "group",
+      position: groupPosition,
+      width: groupWidth,
+      height: groupHeight,
+      style: { width: groupWidth, height: groupHeight },
+      data: { title: "그룹" } as unknown as Record<string, unknown>,
+    };
+
+    setNodes((nds) => {
+      const selectedIds = new Set(selectedNodes.map((n) => n.id));
+      const updated = nds.map((n) => {
+        if (selectedIds.has(n.id)) {
+          return {
+            ...n,
+            parentId: groupId,
+            extent: "parent" as const,
+            position: {
+              x: n.position.x - groupPosition.x,
+              y: n.position.y - groupPosition.y,
+            },
+          };
+        }
+        return n;
+      });
+      // Group node must come before its children
+      const result = [groupNode, ...updated];
+      markDirtyAndSave(result, edgesRef.current);
+      return result;
+    });
+  }, [pushSnapshot, setNodes, markDirtyAndSave]);
+
+  // Ungroup selected group nodes
+  const handleUngroupNodes = useCallback(() => {
+    const currentNodes = nodesRef.current;
+    const selectedGroups = currentNodes.filter(
+      (n) => n.selected && n.type === "group",
+    );
+    if (selectedGroups.length === 0) return;
+
+    pushSnapshot(currentNodes, edgesRef.current);
+
+    const groupIds = new Set(selectedGroups.map((g) => g.id));
+    const groupPositions = new Map(
+      selectedGroups.map((g) => [g.id, g.position]),
+    );
+
+    setNodes((nds) => {
+      const updated = nds
+        .filter((n) => !groupIds.has(n.id))
+        .map((n) => {
+          if (n.parentId && groupIds.has(n.parentId)) {
+            const groupPos = groupPositions.get(n.parentId)!;
+            return {
+              ...n,
+              parentId: undefined,
+              extent: undefined,
+              position: {
+                x: n.position.x + groupPos.x,
+                y: n.position.y + groupPos.y,
+              },
+            };
+          }
+          return n;
+        });
+      markDirtyAndSave(updated, edgesRef.current);
+      return updated;
+    });
+  }, [pushSnapshot, setNodes, markDirtyAndSave]);
+
   // Wire keyboard shortcuts
   useEditorShortcuts({
     onSave: handleShortcutSave,
     onUndo: handleShortcutUndo,
     onRedo: handleShortcutRedo,
     onDuplicate: handleDuplicate,
+    onGroup: handleGroupNodes,
+    onUngroup: handleUngroupNodes,
   });
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent) => {
+      const selectedNodes = nodesRef.current.filter((n) => n.selected);
+      if (selectedNodes.length < 2) return;
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY });
+    },
+    [],
+  );
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // Align selected nodes
+  const handleAlign = useCallback(
+    (direction: AlignDirection) => {
+      const currentNodes = nodesRef.current;
+      const selectedNodes = currentNodes.filter((n) => n.selected);
+      if (selectedNodes.length < 2) return;
+
+      pushSnapshot(currentNodes, edgesRef.current);
+
+      let targetValue: number;
+      if (direction === "left") {
+        targetValue = Math.min(...selectedNodes.map((n) => n.position.x));
+      } else if (direction === "right") {
+        targetValue = Math.max(
+          ...selectedNodes.map(
+            (n) => n.position.x + (n.measured?.width ?? n.width ?? 180),
+          ),
+        );
+      } else if (direction === "top") {
+        targetValue = Math.min(...selectedNodes.map((n) => n.position.y));
+      } else {
+        targetValue = Math.max(
+          ...selectedNodes.map(
+            (n) => n.position.y + (n.measured?.height ?? n.height ?? 80),
+          ),
+        );
+      }
+
+      const selectedIds = new Set(selectedNodes.map((n) => n.id));
+
+      setNodes((nds) => {
+        const updated = nds.map((n) => {
+          if (!selectedIds.has(n.id)) return n;
+          const w = n.measured?.width ?? n.width ?? 180;
+          const h = n.measured?.height ?? n.height ?? 80;
+          if (direction === "left") {
+            return { ...n, position: { ...n.position, x: targetValue } };
+          } else if (direction === "right") {
+            return {
+              ...n,
+              position: { ...n.position, x: targetValue - w },
+            };
+          } else if (direction === "top") {
+            return { ...n, position: { ...n.position, y: targetValue } };
+          } else {
+            return {
+              ...n,
+              position: { ...n.position, y: targetValue - h },
+            };
+          }
+        });
+        markDirtyAndSave(updated, edgesRef.current);
+        return updated;
+      });
+    },
+    [pushSnapshot, setNodes, markDirtyAndSave],
+  );
+
+  // Distribute selected nodes evenly
+  const handleDistribute = useCallback(
+    (axis: DistributeAxis) => {
+      const currentNodes = nodesRef.current;
+      const selectedNodes = currentNodes.filter((n) => n.selected);
+      if (selectedNodes.length < 3) return;
+
+      pushSnapshot(currentNodes, edgesRef.current);
+
+      const selectedIds = new Set(selectedNodes.map((n) => n.id));
+
+      if (axis === "horizontal") {
+        const sorted = [...selectedNodes].sort(
+          (a, b) => a.position.x - b.position.x,
+        );
+        const first = sorted[0]!;
+        const last = sorted[sorted.length - 1]!;
+        const totalSpan =
+          last.position.x +
+          (last.measured?.width ?? last.width ?? 180) -
+          first.position.x;
+        const totalNodeWidth = sorted.reduce(
+          (sum, n) => sum + (n.measured?.width ?? n.width ?? 180),
+          0,
+        );
+        const gap = (totalSpan - totalNodeWidth) / (sorted.length - 1);
+        let currentX = first.position.x;
+        const positionMap = new Map<string, number>();
+        for (const node of sorted) {
+          positionMap.set(node.id, currentX);
+          currentX += (node.measured?.width ?? node.width ?? 180) + gap;
+        }
+
+        setNodes((nds) => {
+          const updated = nds.map((n) => {
+            if (!selectedIds.has(n.id)) return n;
+            const newX = positionMap.get(n.id);
+            if (newX == null) return n;
+            return { ...n, position: { ...n.position, x: newX } };
+          });
+          markDirtyAndSave(updated, edgesRef.current);
+          return updated;
+        });
+      } else {
+        const sorted = [...selectedNodes].sort(
+          (a, b) => a.position.y - b.position.y,
+        );
+        const first = sorted[0]!;
+        const last = sorted[sorted.length - 1]!;
+        const totalSpan =
+          last.position.y +
+          (last.measured?.height ?? last.height ?? 80) -
+          first.position.y;
+        const totalNodeHeight = sorted.reduce(
+          (sum, n) => sum + (n.measured?.height ?? n.height ?? 80),
+          0,
+        );
+        const gap = (totalSpan - totalNodeHeight) / (sorted.length - 1);
+        let currentY = first.position.y;
+        const positionMap = new Map<string, number>();
+        for (const node of sorted) {
+          positionMap.set(node.id, currentY);
+          currentY += (node.measured?.height ?? node.height ?? 80) + gap;
+        }
+
+        setNodes((nds) => {
+          const updated = nds.map((n) => {
+            if (!selectedIds.has(n.id)) return n;
+            const newY = positionMap.get(n.id);
+            if (newY == null) return n;
+            return { ...n, position: { ...n.position, y: newY } };
+          });
+          markDirtyAndSave(updated, edgesRef.current);
+          return updated;
+        });
+      }
+    },
+    [pushSnapshot, setNodes, markDirtyAndSave],
+  );
 
   // Beforeunload warning
   useEffect(() => {
@@ -389,28 +709,108 @@ function EditorInner({
       </div>
 
       {/* Main editor area */}
-      <div className="flex min-h-0 flex-1">
-        <NodeListPanel nodes={nodes} onNodeSelect={handleNodeSelect} />
-
-        <div className="min-h-0 flex-1">
-          <Canvas
+      {(() => {
+        const nodeListEl = (
+          <NodeListPanel nodes={nodes} onNodeSelect={handleNodeSelect} />
+        );
+        const propertyEl = (
+          <PropertyPanel
             nodes={nodes}
-            edges={edges}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            onConnect={handleConnect}
-            onSelectionChange={handleSelectionChange}
-            onNodeDragStop={handleNodeDragStop}
-            onMoveEnd={handleMoveEnd}
+            selectedNodeId={selectedNodeId}
+            onNodeDataChange={handleNodeDataChange}
           />
-        </div>
+        );
 
-        <PropertyPanel
-          nodes={nodes}
-          selectedNodeId={selectedNodeId}
-          onNodeDataChange={handleNodeDataChange}
-        />
-      </div>
+        const showNodeList =
+          layoutPreset !== "property-only" && isNodeListOpen;
+        const showProperty = isPropertyPanelOpen;
+
+        // Determine left and right panel contents based on preset
+        let leftPanel: React.ReactNode = null;
+        let rightPanel: React.ReactNode = null;
+        let leftCollapsed = false;
+        let rightCollapsed = false;
+
+        const isPropertyOnly = layoutPreset === "property-only";
+
+        if (layoutPreset === "reversed") {
+          leftPanel = showProperty ? propertyEl : null;
+          rightPanel = showNodeList ? nodeListEl : null;
+          leftCollapsed = !showProperty;
+          rightCollapsed = !isNodeListOpen;
+        } else {
+          leftPanel = showNodeList ? nodeListEl : null;
+          rightPanel = showProperty ? propertyEl : null;
+          leftCollapsed = !isPropertyOnly && !isNodeListOpen;
+          rightCollapsed = !showProperty;
+        }
+
+        return (
+          <div className="flex min-h-0 flex-1">
+            {/* Left panel */}
+            {leftPanel && (
+              <aside className={`shrink-0 overflow-hidden border-r ${layoutPreset === "reversed" ? "w-72" : "w-60"}`}>
+                {leftPanel}
+              </aside>
+            )}
+
+            {/* Canvas - fills remaining space */}
+            <div className="relative flex-1">
+              {leftCollapsed && (
+                <button
+                  type="button"
+                  className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-md border bg-card p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+                  onClick={layoutPreset === "reversed" ? togglePropertyPanel : toggleNodeList}
+                  aria-label={layoutPreset === "reversed" ? "속성 열기" : "목록 열기"}
+                >
+                  <PanelLeftOpen className="h-4 w-4" />
+                </button>
+              )}
+              <div className="h-full w-full" onContextMenu={handleContextMenu}>
+                <Canvas
+                  nodes={nodes}
+                  edges={edges}
+                  onNodesChange={handleNodesChange}
+                  onEdgesChange={handleEdgesChange}
+                  onConnect={handleConnect}
+                  onSelectionChange={handleSelectionChange}
+                  onNodeDragStop={handleNodeDragStop}
+                  onMoveEnd={handleMoveEnd}
+                  onNodeDrop={handleNodeDrop}
+                />
+                {contextMenu && (
+                  <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onAlign={handleAlign}
+                    onDistribute={handleDistribute}
+                    onGroup={handleGroupNodes}
+                    onUngroup={handleUngroupNodes}
+                    onClose={handleCloseContextMenu}
+                  />
+                )}
+              </div>
+              {rightCollapsed && (
+                <button
+                  type="button"
+                  className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-md border bg-card p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+                  onClick={layoutPreset === "reversed" ? toggleNodeList : togglePropertyPanel}
+                  aria-label={layoutPreset === "reversed" ? "목록 열기" : "속성 열기"}
+                >
+                  <PanelRightOpen className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Right panel */}
+            {rightPanel && (
+              <aside className={`shrink-0 overflow-hidden border-l ${layoutPreset === "reversed" ? "w-60" : "w-72"}`}>
+                {rightPanel}
+              </aside>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Toolbar */}
       <Toolbar onAddNode={handleAddNode} />

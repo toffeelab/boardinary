@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, NodeResizer, type NodeProps } from "@xyflow/react";
 import type { StoryboardNodeData } from "@repo/types";
 
 function EventNodeComponent({ data, selected }: NodeProps) {
@@ -18,6 +18,12 @@ function EventNodeComponent({ data, selected }: NodeProps) {
         borderLeftWidth: 4,
       }}
     >
+      <NodeResizer
+        isVisible={selected}
+        minWidth={120}
+        minHeight={60}
+        handleStyle={{ width: 8, height: 8 }}
+      />
       <Handle
         type="target"
         position={Position.Left}

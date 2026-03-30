@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { Node } from "@xyflow/react";
+import { PanelLeftClose } from "lucide-react";
 import type { StoryboardNodeData } from "@repo/types";
 import { useEditorStore } from "@/stores/editor-store";
 import { Separator } from "@/components/ui/separator";
@@ -20,7 +21,7 @@ const NODE_TYPE_CONFIG = {
 type NodeType = keyof typeof NODE_TYPE_CONFIG;
 
 export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
-  const { isNodeListOpen, selectedNodeId } = useEditorStore();
+  const { selectedNodeId, toggleNodeList } = useEditorStore();
 
   const groupedNodes = useMemo(() => {
     const groups: Record<NodeType, Node[]> = {
@@ -37,17 +38,25 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
     return groups;
   }, [nodes]);
 
-  if (!isNodeListOpen) return null;
-
   const hasNodes = nodes.length > 0;
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-border bg-card">
-      <div className="px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">노드 목록</h2>
+    <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
+      <div className="flex items-center justify-between px-4 py-3">
+        <h2 className="truncate text-sm font-semibold text-foreground">
+          노드 목록
+        </h2>
+        <button
+          type="button"
+          onClick={toggleNodeList}
+          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="목록 닫기"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
       </div>
       <Separator />
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-2">
         {!hasNodes && (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">
             툴바에서 노드를 추가하세요
@@ -65,7 +74,7 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
                       className="inline-block h-2.5 w-2.5 rounded-full"
                       style={{ backgroundColor: config.color }}
                     />
-                    <span className="text-xs font-medium text-muted-foreground">
+                    <span className="truncate text-xs font-medium text-muted-foreground">
                       {config.label} ({typeNodes.length})
                     </span>
                   </div>
@@ -78,7 +87,7 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
                           key={node.id}
                           type="button"
                           onClick={() => onNodeSelect(node.id)}
-                          className={`w-full rounded-md px-3 py-1.5 text-left text-sm transition-colors ${
+                          className={`w-full truncate rounded-md px-3 py-1.5 text-left text-sm transition-colors ${
                             isSelected
                               ? "bg-accent text-accent-foreground"
                               : "text-foreground hover:bg-accent/50"

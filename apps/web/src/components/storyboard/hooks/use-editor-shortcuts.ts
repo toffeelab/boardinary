@@ -7,6 +7,8 @@ interface UseEditorShortcutsOptions {
   onUndo: () => void;
   onRedo: () => void;
   onDuplicate: () => void;
+  onGroup?: () => void;
+  onUngroup?: () => void;
 }
 
 export function useEditorShortcuts({
@@ -14,6 +16,8 @@ export function useEditorShortcuts({
   onUndo,
   onRedo,
   onDuplicate,
+  onGroup,
+  onUngroup,
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -42,10 +46,19 @@ export function useEditorShortcuts({
           e.preventDefault();
           onDuplicate();
           break;
+        case "g":
+          if (e.shiftKey) {
+            e.preventDefault();
+            onUngroup?.();
+          } else {
+            e.preventDefault();
+            onGroup?.();
+          }
+          break;
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onSave, onUndo, onRedo, onDuplicate]);
+  }, [onSave, onUndo, onRedo, onDuplicate, onGroup, onUngroup]);
 }

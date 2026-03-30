@@ -1,10 +1,12 @@
 "use client";
 
+import { useCallback } from "react";
 import {
   ReactFlow,
   Background,
   MiniMap,
   Controls,
+  useReactFlow,
   type Connection,
   type Node,
   type Edge,
@@ -16,6 +18,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { nodeTypes } from "./nodes/node-types";
 import { edgeTypes } from "./edges/edge-types";
+import { useEdgeValidation } from "./hooks/use-edge-validation";
 
 interface CanvasProps {
   nodes: Node[];
@@ -33,6 +36,10 @@ interface CanvasProps {
     event: MouseEvent | TouchEvent | null,
     viewport: Viewport,
   ) => void;
+  onNodeDrop?: (
+    type: "scene" | "event" | "branch",
+    position: { x: number; y: number },
+  ) => void;
 }
 
 export function Canvas({
@@ -44,7 +51,32 @@ export function Canvas({
   onSelectionChange,
   onNodeDragStop,
   onMoveEnd,
+  onNodeDrop,
 }: CanvasProps) {
+  const { screenToFlowPosition } = useReactFlow();
+  const { isValidConnection } = useEdgeValidation(edges);
+
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const type = event.dataTransfer.getData("application/boardinary-node");
+      if (!type) return;
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      onNodeDrop?.(type as "scene" | "event" | "branch", position);
+    },
+    [screenToFlowPosition, onNodeDrop],
+  );
+
   return (
     <div className="h-full w-full">
       <ReactFlow
@@ -56,6 +88,9 @@ export function Canvas({
         onSelectionChange={onSelectionChange}
         onNodeDragStop={onNodeDragStop}
         onMoveEnd={onMoveEnd}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: "labeled" }}
