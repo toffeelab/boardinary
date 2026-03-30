@@ -1,0 +1,85 @@
+name: Cleanup Stale Branches
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # Every Sunday at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (log only, no deletions)'
+        type: boolean
+        default: true
+
+env:
+  DRY_RUN: ${{ github.event.inputs.dry_run || 'true' }}
+  BRANCH_PATTERN: '{{BRANCH_PATTERN}}' # default: feature/*
+  RETENTION_DAYS: '{{RETENTION_DAYS}}' # default: 90
+
+jobs:
+  cleanup:
+    name: Delete Stale Merged Branches
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find and delete stale merged branches
+        run: |
+          echo "=== Branch Cleanup ==="
+          echo "Pattern:        $BRANCH_PATTERN"
+          echo "Retention days: $RETENTION_DAYS"
+          echo "Dry run:        $DRY_RUN"
+          echo ""
+
+          CUTOFF_DATE=$(date -u -d "$RETENTION_DAYS days ago" +%s 2>/dev/null \
+            || date -u -v-${RETENTION_DAYS}d +%s)
+
+          DELETED=0
+          SKIPPED=0
+
+          for BRANCH in $(git branch -r --merged origin/main \
+            | sed 's|origin/||' \
+            | grep -v '^\s*$' \
+            | grep -v 'HEAD' \
+            | xargs -I{} echo {} \
+            | sed 's/^[[:space:]]*//')
+          do
+            # Skip protected branches
+            if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "develop" ]; then
+              continue
+            fi
+
+            # Check if branch matches the pattern
+            case "$BRANCH" in
+              $BRANCH_PATTERN) ;;
+              *) continue ;;
+            esac
+
+            # Get the last commit date
+            LAST_COMMIT=$(git log -1 --format=%ct "origin/$BRANCH" 2>/dev/null || echo "0")
+
+            if [ "$LAST_COMMIT" -lt "$CUTOFF_DATE" ]; then
+              DAYS_OLD=$(( ($(date +%s) - LAST_COMMIT) / 86400 ))
+
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "[DRY RUN] Would delete: $BRANCH (${DAYS_OLD} days old)"
+              else
+                echo "Deleting: $BRANCH (${DAYS_OLD} days old)"
+                git push origin --delete "$BRANCH"
+              fi
+              DELETED=$((DELETED + 1))
+            else
+              SKIPPED=$((SKIPPED + 1))
+            fi
+          done
+
+          echo ""
+          echo "=== Summary ==="
+          echo "Branches to delete: $DELETED"
+          echo "Branches kept:      $SKIPPED"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "(Dry run — no branches were actually deleted)"
+          fi
