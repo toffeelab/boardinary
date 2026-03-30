@@ -7,10 +7,17 @@ Boardinary 프로젝트에서 검증된 패턴을 추출하여, 프레임워크/
 
 **배포 형태:** 현재 프로젝트 내 `templates/harness/`에 레퍼런스로 관리. 두 번째 프로젝트 적용 시 별도 리포로 분리(졸업).
 
+**졸업 기준:** 두 번째 프로젝트에 적용 완료 + 해당 프로젝트에서 1주일 이상 안정적 사용 확인 시 별도 리포로 분리.
+
 **범위 경계:**
 
 - Repository Level (이 스펙): 프로젝트 무관한 범용 템플릿
 - Application Level (별도 스펙): Boardinary 특화 하네스 (앱별 CLAUDE.md, 도메인 ESLint 룰, 특화 hooks 등)
+
+**출처 구분:**
+
+- Boardinary에서 추출한 검증된 패턴: hooks, claude-review, cleanup-branches, scripts, memory
+- 새로 설계한 패턴: ci.yml (Boardinary는 개별 워크플로우 사용), init-harness.sh
 
 ---
 
@@ -21,7 +28,7 @@ Mirror 구조 — 실제 프로젝트의 파일 배치를 그대로 반영하여
 ```
 templates/harness/
 ├── .claude/
-│   ├── settings.json.template
+│   ├── settings.json.template      # → 프로젝트/.claude/settings.json (팀 공유, 커밋 대상)
 │   └── hooks/
 │       ├── PreToolUse/
 │       │   ├── block-dangerous-commands.sh
@@ -34,9 +41,10 @@ templates/harness/
 │       ├── ci.yml
 │       └── cleanup-branches.yml
 ├── scripts/
+│   ├── init-harness.sh             # 플레이스홀더 치환 + 초기 설정
 │   ├── health-check.sh
 │   └── doc-check.sh
-├── memory/
+├── memory/                          # → ~/.claude/projects/<hash>/memory/ 에 복사
 │   ├── MEMORY.md
 │   └── _examples/
 │       ├── user_role.md
@@ -47,33 +55,99 @@ templates/harness/
 └── README.md
 ```
 
+### 파일 배치 규칙
+
+| 템플릿 경로          | 복사 대상                           | 비고                    |
+| -------------------- | ----------------------------------- | ----------------------- |
+| `.claude/`           | 프로젝트 루트 `.claude/`            | 팀 공유, git 커밋       |
+| `.github/`           | 프로젝트 루트 `.github/`            |                         |
+| `scripts/`           | 프로젝트 루트 `scripts/`            |                         |
+| `memory/`            | `~/.claude/projects/<hash>/memory/` | 사용자별, git 비추적    |
+| `CLAUDE.md.template` | 프로젝트 루트 `CLAUDE.md`           | `.template` 확장자 제거 |
+
+### settings.json 파일 구분
+
+| 파일                          | 용도                              | 커밋 여부            |
+| ----------------------------- | --------------------------------- | -------------------- |
+| `.claude/settings.json`       | 팀 공유 설정 (hooks, permissions) | O — 이 템플릿의 대상 |
+| `.claude/settings.local.json` | 개인 오버라이드                   | X — gitignore 대상   |
+| `~/.claude/settings.json`     | 글로벌 사용자 설정                | 템플릿 범위 밖       |
+
 ---
 
 ## Claude Code Hooks
+
+### Hook 입출력 규약
+
+- hook 스크립트는 **stdin으로 JSON**을 받음 (`tool_name`, `tool_input`, `cwd`, `session_id` 등)
+- `settings.json`의 `env` 블록은 모델에만 전달되고 **hook 서브프로세스에는 전달되지 않음**
+- hook에서 필요한 설정값은 **스크립트 상단에 직접 정의**하거나, `SessionStart` hook에서 `$CLAUDE_ENV_FILE`에 기록
+- exit 0: 통과, exit 2: BLOCK (차단)
+
+### 환경 설정 전략
+
+hook이 브랜치명/패키지매니저 등을 알아야 하므로, 두 가지 방식 중 택1:
+
+**방식 A (추천): 스크립트 상단 상수 정의**
+
+```bash
+#!/bin/bash
+MAIN_BRANCH="main"
+DEVELOP_BRANCH="develop"
+# ... 나머지 로직
+```
+
+- 단순하고 디버깅 쉬움
+- `init-harness.sh`가 플레이스홀더를 치환
+
+**방식 B: SessionStart + CLAUDE_ENV_FILE**
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": ["sh .claude/hooks/session-init.sh"]
+      }
+    ]
+  }
+}
+```
+
+- `session-init.sh`가 `echo 'export MAIN_BRANCH=main' >> "$CLAUDE_ENV_FILE"` 실행
+- 동적 값 필요 시 유용하나, v1에서는 과도
+
+**v1은 방식 A 채택.** 정적 값이므로 스크립트 상단 정의로 충분.
 
 ### PreToolUse
 
 #### `block-dangerous-commands.sh`
 
 - **트리거:** `Bash` 도구 호출 시
+- **입력:** stdin JSON에서 `tool_input.command` 추출 (`jq` 사용)
 - **차단 대상:** `git push --force`, `git reset --hard`, `rm -rf /`, `drop table`, `git checkout .` 등
-- **동작:** 매칭 시 exit 2 (BLOCK) + 사유 출력
+- **동작:** 매칭 시 exit 2 (BLOCK) + 사유를 stderr로 출력
 - **커스터마이징:** 파일 상단 `BLOCKED_PATTERNS` 배열로 프로젝트별 패턴 추가
 
 #### `warn-main-branch-edit.sh`
 
 - **트리거:** `Edit`, `Write` 도구 호출 시
-- **동작:** 현재 브랜치가 `$MAIN_BRANCH` 또는 `$DEVELOP_BRANCH`이고, 대상 파일이 `docs/` 밖이면 exit 2 (BLOCK)
-- **의도:** 보호 브랜치에서의 코드 직접 수정 방지
+- **입력:** stdin JSON에서 `tool_input.file_path` 추출 + `git branch --show-current`로 현재 브랜치 확인
+- **동작:** 현재 브랜치가 보호 브랜치이고, 대상 파일이 `docs/` 밖이면 exit 2 (BLOCK)
+- **보호 브랜치:** 스크립트 상단 `PROTECTED_BRANCHES` 배열에 정의 (기본: main, develop)
 
 ### PostToolUse
 
 #### `auto-lint-on-write.sh`
 
 - **트리거:** `Write`, `Edit` 도구 완료 후
-- **동작:** 변경 파일이 `*.ts` / `*.tsx`이면 ESLint `--fix` 실행
+- **입력:** stdin JSON에서 `tool_input.file_path` 추출
+- **동작:** 변경 파일 확장자가 `LINT_EXTENSIONS` 배열에 포함되면 ESLint `--fix` 실행
+- **`LINT_EXTENSIONS`:** 스크립트 상단 정의 (기본: `ts tsx js jsx`), 프로젝트별 변경 가능
 - **출력:** fix 결과를 stderr로 (Claude 피드백)
 - **실패 시:** exit 0 유지 (차단 아님, 정보만 제공)
+- **성능 고려:** 단일 파일 대상이므로 속도 영향 미미. 대규모 자동 생성 시 병목이 되면 비활성화 가능 (README 안내)
 
 ### 의도적 제외
 
@@ -101,6 +175,8 @@ templates/harness/
   ### Import 규칙 / 상태 관리 / 타입 규칙 / 린팅 & 포매팅
 ## 개발 워크플로우
   ### Git Flow / 브랜치 네이밍 / 커밋 컨벤션 / PR 규칙
+  ### Worktree 기반 작업 (선택 — 병렬 작업 시)
+  ### 작업 순서 (선택 — Superpowers 스킬 사용 시)
 ## 참조 문서
 ## 금지 사항
 ```
@@ -110,6 +186,7 @@ templates/harness/
 - 섹션 순서 = 우선순위 (위에서부터 중요한 정보)
 - 참조 문서 테이블에 "언제 참조" 컬럼 → 필요 시에만 읽기
 - 금지 사항은 맨 아래이나 `IMPORTANT` 마커로 강조
+- "Worktree 기반 작업", "작업 순서"는 선택적 섹션 (해당 시 추가)
 
 ---
 
@@ -117,15 +194,19 @@ templates/harness/
 
 ### `claude-review.yml` — PR 코드리뷰 (Claude)
 
-- **트리거:** PR opened / synchronize / ready_for_review
+- **트리거:** PR opened / synchronize / ready_for_review + `issue_comment` (`@claude` 리리뷰 요청)
 - **제외 경로:** `docs/**`, `*.md`, `.github/**`, `.claude/**`, lock 파일
 - **리뷰 모드:** 증분 (이전 리뷰 커밋 이후 변경분) vs 풀 (첫 리뷰) 자동 판별
 - **리뷰 기준:** 🔴 Critical (머지 차단), 🟡 Important (수정 권장), 🔵 Suggestion (선택)
 - **판정:** 🔵만 → APPROVED, 🔴 있으면 → CHANGES_REQUESTED
 - **플레이스홀더:** `{{REVIEW_MODEL}}` (기본: claude-haiku-4-5-20251001), `{{REVIEW_LANGUAGE}}` (기본: English)
 - **커스터마이징:** 파일 상단 `EXCLUDE_PATTERNS` 변수로 프로젝트별 필터 추가
+- **Secrets 필요:** `ANTHROPIC_API_KEY`
+- **참고:** 이 워크플로우는 Boardinary의 185줄 검증 코드를 기반으로 범용화. 복잡도가 높으므로 README에 커스터마이징 가이드 포함
 
-### `ci.yml` — 통합 품질 게이트
+### `ci.yml` — 통합 품질 게이트 (새 설계)
+
+> 참고: Boardinary는 개별 워크플로우(`e2e.yml`, `doc-check.yml`)를 사용. 이 통합 ci.yml은 범용 템플릿을 위해 새로 설계한 패턴.
 
 ```
 lint (독립) ──┐
@@ -141,13 +222,15 @@ test (독립, DB service 포함)
 
 ### `cleanup-branches.yml` — 브랜치 자동 정리
 
-- **스케줄:** 주간 크론 (일요일 03:00 UTC)
+- **스케줄:** 주간 크론 (일요일 03:00 UTC) + `workflow_dispatch` (수동 실행)
 - **대상:** `{{BRANCH_PATTERN}}` (기본: `feature/*`) + 머지 완료 + `{{RETENTION_DAYS}}` (기본: 90일) 초과
 - **보호:** main, develop 등 보호 브랜치 제외
 
 ---
 
 ## settings.json 템플릿
+
+대상 파일: `.claude/settings.json` (팀 공유, 커밋 대상)
 
 ```jsonc
 {
@@ -163,12 +246,11 @@ test (독립, DB service 포함)
       "Bash({{PACKAGE_MANAGER}} run:*)",
       "Bash(docker compose:*)",
     ],
-    "deny": [],
-  },
-  "env": {
-    "MAIN_BRANCH": "{{MAIN_BRANCH}}",
-    "DEVELOP_BRANCH": "{{DEVELOP_BRANCH}}",
-    "PACKAGE_MANAGER": "{{PACKAGE_MANAGER}}",
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+    ],
   },
   "hooks": {
     "PreToolUse": [
@@ -194,12 +276,21 @@ test (독립, DB service 포함)
 **설계 결정:**
 
 - `allow`에 자주 쓰는 안전한 명령 사전 등록 — 승인 피로 제거
-- `deny`는 비워둠 — hooks가 차단 담당 (이중 관리 방지)
-- `env`로 hooks 스크립트에 환경 전달
+- `deny`에 위험 명령 명시 — hooks와 이중 방어 (defense-in-depth). hooks가 실패하더라도 `deny`가 최후 방어선
+- `env` 블록 사용하지 않음 — hook 서브프로세스에 전달되지 않으므로. 환경값은 각 hook 스크립트 상단에 직접 정의
+- `matcher`의 `|` 구문: 여러 도구를 OR로 매칭 (예: `"Edit|Write"`)
 
 ---
 
 ## 스크립트
+
+### `scripts/init-harness.sh` (신규)
+
+- 대화형으로 플레이스홀더 값을 입력받아 `*.template` 파일에 `sed` 치환
+- `.template` 확장자 제거
+- hook 스크립트의 상단 상수값 치환
+- `memory/` 디렉토리를 `~/.claude/projects/` 올바른 경로에 복사
+- 실행 후 자가 삭제 (init은 1회성)
 
 ### `scripts/health-check.sh`
 
@@ -216,11 +307,14 @@ test (독립, DB service 포함)
 - 참조 문서 테이블 경로 검증
 - 깨진 링크 리포트
 - exit 1 on failure (CI 연결 시 게이트 사용 가능)
-- CI 워크플로우 연결은 선택적 (README에 안내)
+- CI 워크플로우 연결은 선택적 (README에 연결 방법 안내)
+- 범위: 범용 참조 검증만. 프로젝트 특화 검증(features.json, sprint contract 등)은 Application Level에서 추가
 
 ---
 
 ## 메모리 시스템 초기 구조
+
+**중요:** Claude Code의 메모리는 `~/.claude/projects/<project-hash>/memory/`에 저장되며, 프로젝트 리포 안이 아님. 이 템플릿의 `memory/` 디렉토리는 **복사 소스**로, `init-harness.sh`가 올바른 경로에 설치한다.
 
 ```
 memory/
@@ -264,13 +358,14 @@ type: { { user|feedback|project|reference } }
 ## README.md
 
 1. **개요** — 이 템플릿이 뭔지, 왜 필요한지
-2. **초기 설정**
-   - 플레이스홀더 전체 목록 + 설명 + 기본값
-   - 필요한 GitHub Secrets (`ANTHROPIC_API_KEY` 등)
-   - 파일별 복사 위치 매핑 표
-3. **구성요소별 사용법** — Hooks / CI / Scripts / Memory / CLAUDE.md
-4. **커스터마이징 가이드** — Application Level로 확장하는 법
-5. **졸업 기준** — 별도 리포로 분리하는 시점 + 방법
+2. **빠른 시작**
+   - `scripts/init-harness.sh` 실행 방법
+   - 필요한 GitHub Secrets (`ANTHROPIC_API_KEY`)
+3. **플레이스홀더 목록** — 전체 목록 + 설명 + 기본값
+4. **파일별 복사 위치** — 매핑 표
+5. **구성요소별 사용법** — Hooks / CI / Scripts / Memory / CLAUDE.md
+6. **커스터마이징 가이드** — Application Level로 확장하는 법
+7. **졸업 기준** — 별도 리포로 분리하는 시점 + 방법
 
 ---
 
@@ -292,3 +387,4 @@ type: { { user|feedback|project|reference } }
 | `{{BRANCH_PATTERN}}`  | 정리 대상 브랜치 패턴 | `feature/*`                 |
 | `{{RETENTION_DAYS}}`  | 브랜치 보존 기간      | `90`                        |
 | `{{DB_SERVICE}}`      | E2E용 DB 서비스 설정  | PostgreSQL 17               |
+| `{{LINT_EXTENSIONS}}` | lint 대상 확장자      | `ts tsx js jsx`             |
