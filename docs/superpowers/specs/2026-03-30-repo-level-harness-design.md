@@ -30,6 +30,8 @@ templates/harness/
 ├── .claude/
 │   ├── settings.json.template      # → 프로젝트/.claude/settings.json (팀 공유, 커밋 대상)
 │   └── hooks/
+│       ├── _lib/
+│       │   └── common.sh           # 공유 유틸: jq 체크, stdin 파싱, exit 헬퍼
 │       ├── PreToolUse/
 │       │   ├── block-dangerous-commands.sh
 │       │   └── warn-main-branch-edit.sh
@@ -41,7 +43,7 @@ templates/harness/
 │       ├── ci.yml
 │       └── cleanup-branches.yml
 ├── scripts/
-│   ├── init-harness.sh             # 플레이스홀더 치환 + 초기 설정
+│   ├── init-harness.sh             # 플레이스홀더 치환 + 초기 설정 (멱등성)
 │   ├── health-check.sh
 │   └── doc-check.sh
 ├── memory/                          # → ~/.claude/projects/<hash>/memory/ 에 복사
@@ -119,6 +121,57 @@ DEVELOP_BRANCH="develop"
 - 동적 값 필요 시 유용하나, v1에서는 과도
 
 **v1은 방식 A 채택.** 정적 값이므로 스크립트 상단 정의로 충분.
+
+### Hook 공유 라이브러리 (`_lib/common.sh`)
+
+모든 hook 스크립트가 source하는 공통 유틸리티. 보일러플레이트 중복을 제거하고, 새 hook 추가 시 일관된 패턴을 보장.
+
+```bash
+#!/bin/bash
+# .claude/hooks/_lib/common.sh — 모든 hook이 source하는 공유 유틸
+
+# jq 의존성 체크: 미설치 시 경고 후 통과
+if ! command -v jq &>/dev/null; then
+  echo "WARNING: jq not installed. Hook skipped." >&2
+  exit 0
+fi
+
+# stdin에서 JSON 읽기
+HOOK_INPUT=$(cat)
+
+# 공통 필드 추출 헬퍼
+hook_get() {
+  echo "$HOOK_INPUT" | jq -r "$1 // empty"
+}
+
+# 표준 차단 함수 (exit 2 + 사유 출력)
+hook_block() {
+  echo "BLOCKED: $1" >&2
+  exit 2
+}
+
+# 표준 경고 함수 (exit 0 + 메시지)
+hook_warn() {
+  echo "WARNING: $1" >&2
+}
+```
+
+**사용 예시:**
+
+```bash
+#!/bin/bash
+source "$(dirname "$0")/../_lib/common.sh"
+
+COMMAND=$(hook_get '.tool_input.command')
+# ... 로직
+hook_block "git push --force is not allowed"
+```
+
+**확장 시 이점:**
+
+- 새 hook 추가 시 `source common.sh` 한 줄로 jq 체크/파싱 해결
+- jq fallback 전략 변경 시 한 곳만 수정
+- `hook_get`, `hook_block`, `hook_warn` 인터페이스가 hook 간 일관성 보장
 
 ### PreToolUse
 
@@ -315,7 +368,7 @@ test (독립, DB service 포함)
 
 - lint + type-check 통과 → build 실행 → build 통과 → e2e 실행
 - test는 독립 (DB 등 별도 환경)
-- e2e job에 `{{DB_SERVICE}}` 플레이스홀더로 services 블록 포함
+- e2e/test job의 `services` 블록: sed 치환이 불가능한 멀티라인 YAML이므로, 플레이스홀더 대신 **주석으로 안내** (`# TODO: Add your database service here`)
 - 명령어 전부 플레이스홀더: `{{LINT_CMD}}`, `{{BUILD_CMD}}`, `{{TEST_CMD}}`, `{{E2E_CMD}}`
 
 ### `cleanup-branches.yml` — 브랜치 자동 정리
@@ -389,36 +442,70 @@ test (독립, DB service 포함)
 #### 실행 흐름
 
 ```
-1. 상태 감지
-   - .claude/settings.json 존재 여부
-   - CLAUDE.md 존재 여부
-   - hook 스크립트 존재 여부
-   - memory 디렉토리 존재 여부
+1. 모듈 선택 (대화형)
+   [1/4] Claude Code Hooks (settings.json + hook 스크립트)?  [Y/n]
+   [2/4] CI/CD Workflows?  [Y/n]
+     ├── claude-review.yml?  [Y/n]
+     ├── ci.yml?  [Y/n]
+     └── cleanup-branches.yml?  [Y/n]
+   [3/4] Scripts (health-check, doc-check)?  [Y/n]
+   [4/4] Memory 초기 구조?  [Y/n]
 
-2. 플레이스홀더 입력 (대화형)
+2. 플레이스홀더 입력 (선택된 모듈에 필요한 값만)
    - 기본값 제시, Enter로 수락
    - 이전 실행 시 저장된 값이 있으면 해당 값을 기본값으로 표시
    - 설정값을 .claude/.harness-config에 JSON으로 저장 (재실행 시 참조)
 
-3. 파일별 처리
+3. 파일별 처리 (선택된 모듈만)
    - *.template → sed 치환 → 확장자 제거
    - hook 스크립트 상단 상수 치환
-   - 이미 존재하는 파일: diff 표시 → 덮어쓰기/스킵/백업 선택
+   - 이미 존재하는 파일: 유형별 충돌 처리 (아래 참조)
 
 4. 후처리
-   - chmod +x hook 스크립트
-   - memory/ → ~/.claude/projects/ 복사 (기존 MEMORY.md 있으면 머지 아닌 스킵)
-   - .gitignore에 .claude/settings.local.json 추가 (없으면)
+   - chmod +x hook 스크립트 + _lib/common.sh
+   - memory/ → ~/.claude/projects/ 복사 (기존 MEMORY.md 있으면 스킵)
+   - .gitignore에 .claude/settings.local.json, .claude/.harness-config 추가 (없으면)
 ```
+
+**모듈-플레이스홀더 매핑:**
+
+| 모듈                 | 필요한 플레이스홀더                                                   |
+| -------------------- | --------------------------------------------------------------------- |
+| Hooks                | `MAIN_BRANCH`, `DEVELOP_BRANCH`, `PACKAGE_MANAGER`, `LINT_EXTENSIONS` |
+| claude-review.yml    | `REVIEW_MODEL`, `REVIEW_LANGUAGE`, `DEVELOP_BRANCH`                   |
+| ci.yml               | `LINT_CMD`, `BUILD_CMD`, `TEST_CMD`, `E2E_CMD`, `TYPE_CHECK_CMD`      |
+| cleanup-branches.yml | `BRANCH_PATTERN`, `RETENTION_DAYS`                                    |
+| Scripts              | (없음 — 범용)                                                         |
+| Memory               | `PROJECT_NAME`                                                        |
+
+Hooks만 선택하면 CI 관련 플레이스홀더는 묻지 않음.
 
 #### 충돌 처리
 
-| 상황                              | 동작                                                         |
-| --------------------------------- | ------------------------------------------------------------ |
-| `.claude/settings.json` 이미 존재 | diff 표시 → `[O]verwrite / [S]kip / [B]ackup+overwrite` 선택 |
-| `CLAUDE.md` 이미 존재             | 항상 스킵 (사용자 콘텐츠 보호). 메시지로 안내                |
-| hook 스크립트 이미 존재           | 내용 동일하면 스킵, 다르면 diff 표시 → 선택                  |
-| memory 이미 설치됨                | 스킵. `_examples/`만 없으면 복사                             |
+| 상황                              | 동작                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `.claude/settings.json` 이미 존재 | **필드별 머지** (아래 참조)                                              |
+| `CLAUDE.md` 이미 존재             | 항상 스킵 (사용자 콘텐츠 보호). 메시지로 안내                            |
+| hook 스크립트 이미 존재           | 내용 동일하면 스킵, 다르면 diff 표시 → `[O]verwrite / [S]kip / [B]ackup` |
+| `_lib/common.sh` 이미 존재        | 템플릿 버전이 더 높으면 업데이트 제안, 그 외 스킵                        |
+| workflow 파일 이미 존재           | diff 표시 → `[O]verwrite / [S]kip / [B]ackup`                            |
+| memory 이미 설치됨                | 스킵. `_examples/`만 없으면 복사                                         |
+
+#### settings.json 머지 전략
+
+기존 settings.json이 있을 때 전체 덮어쓰기가 아닌 **필드별 머지**를 수행:
+
+```
+permissions.allow  → 합집합 (기존 + 템플릿, 중복 제거)
+permissions.deny   → 합집합 (기존 + 템플릿, 중복 제거)
+hooks.PreToolUse   → 배열 머지 (기존 항목 유지 + 템플릿 신규 항목 추가)
+hooks.PostToolUse  → 배열 머지 (동일 방식)
+기타 필드          → 기존 값 우선 (템플릿이 덮어쓰지 않음)
+```
+
+**머지 판별 기준:** hook 배열 내 항목은 `hooks[0]` 값(스크립트 경로)으로 동일 여부 판단.
+
+이 전략으로 사용자가 추가한 커스텀 hook, permission이 init-harness.sh 재실행 시에도 보존됨.
 
 #### 저장되는 설정 파일
 
@@ -437,6 +524,36 @@ test (독립, DB service 포함)
 ```
 
 자가 삭제하지 않음. 재실행 시 이전 설정을 기본값으로 사용.
+
+#### 업그레이드 경로
+
+v1에서 완전한 자동 업그레이드는 구현하지 않지만, **구조적으로 예약**:
+
+**`init-harness.sh --check-update` 플래그:**
+
+```
+$ sh scripts/init-harness.sh --check-update
+
+현재 설치 버전: 1.0.0
+템플릿 버전:    1.1.0
+
+변경사항:
+  [NEW] .claude/hooks/PreToolUse/check-env-vars.sh
+  [MOD] .claude/hooks/_lib/common.sh (hook_get 에러 핸들링 개선)
+  [---] .github/workflows/ci.yml (변경 없음)
+
+적용하시겠습니까? [y/N]
+```
+
+**동작 원리:**
+
+- `.harness-config`의 `version`과 템플릿의 `version`을 비교
+- 템플릿의 각 파일에 대해, 프로젝트에 존재 여부 + 내용 동일 여부 체크
+- `[NEW]`: 템플릿에 있고 프로젝트에 없는 파일
+- `[MOD]`: 양쪽 다 있지만 내용이 다른 파일 (diff 표시)
+- `[---]`: 변경 없음
+
+**v1 범위:** `--check-update` 플래그 자체는 v1에서 구현. 실제 자동 적용은 사용자 확인 후 위의 충돌 처리 + 머지 전략을 동일하게 적용.
 
 ### `scripts/health-check.sh`
 
@@ -532,5 +649,6 @@ type: { { user|feedback|project|reference } }
 | `{{REVIEW_LANGUAGE}}` | 리뷰 언어             | `English`                   |
 | `{{BRANCH_PATTERN}}`  | 정리 대상 브랜치 패턴 | `feature/*`                 |
 | `{{RETENTION_DAYS}}`  | 브랜치 보존 기간      | `90`                        |
-| `{{DB_SERVICE}}`      | E2E용 DB 서비스 설정  | PostgreSQL 17               |
 | `{{LINT_EXTENSIONS}}` | lint 대상 확장자      | `ts tsx js jsx`             |
+
+> `DB_SERVICE`는 멀티라인 YAML이라 sed 치환 불가. ci.yml 내 주석(`# TODO: Add your database service here`)으로 안내.
