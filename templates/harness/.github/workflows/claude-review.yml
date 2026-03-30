@@ -1,0 +1,194 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin {{DEVELOP_BRANCH}}:refs/remotes/origin/{{DEVELOP_BRANCH}} || true
+
+      - name: Determine review context
+        id: context
+        run: |
+          if [ "${{ github.event.action }}" = "synchronize" ]; then
+            echo "is_incremental=true" >> $GITHUB_OUTPUT
+            echo "before_sha=${{ github.event.before }}" >> $GITHUB_OUTPUT
+          else
+            echo "is_incremental=false" >> $GITHUB_OUTPUT
+            echo "before_sha=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for Claude Code OAuth token
+        id: token-check
+        run: |
+          if [ -z "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
+            echo "has_token=false" >> $GITHUB_OUTPUT
+            echo "::warning::CLAUDE_CODE_OAUTH_TOKEN is not set. Skipping Claude review."
+          else
+            echo "has_token=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Claude Code Action
+        if: steps.token-check.outputs.has_token == 'true'
+        id: claude-review
+        uses: anthropics/claude-code-action@e69ec4d5e5868930cecb8da7360a51fa9c4de5d6 # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--model {{REVIEW_MODEL}} --allowedTools 'Bash(git *),Bash(gh *),Read,Glob,Grep'"
+          show_full_output: false
+          prompt: |
+            Review this PR.
+            Review mode: ${{ steps.context.outputs.is_incremental == 'true' && 'Incremental review' || 'Full review' }}
+            ${{ steps.context.outputs.is_incremental == 'true' && format('Previous commit SHA: {0}', steps.context.outputs.before_sha) || '' }}
+
+            ---
+
+            EXCLUDE_PATTERNS (do not review these files/directories):
+            - `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`
+            - `*.generated.*`
+            - `.github/screenshots/*`
+            - `.github/workflows/*`
+            - `docs/`
+
+            ## Full review mode (when review mode is "Full review")
+            0. Read PR title and body with `gh pr view ${{ github.event.pull_request.number }} --json title,body --jq '"\(.title)\n\(.body)"'` to understand the purpose and context of the changes
+            1. List changed files with `git diff origin/{{DEVELOP_BRANCH}} --name-only`
+            2. Exclude files matching the EXCLUDE_PATTERNS listed above
+            3. Read filtered files individually with `git diff origin/{{DEVELOP_BRANCH}} -- <file>`
+            4. Do NOT read the entire diff at once
+
+            ## Incremental review mode (when review mode is "Incremental review")
+            1. List newly changed files with `git diff ${{ steps.context.outputs.before_sha }}..HEAD --name-only`
+            2. Apply the same EXCLUDE_PATTERNS, then read individual diffs with `git diff ${{ steps.context.outputs.before_sha }}..HEAD -- <file>`
+            3. Fetch the most recent review with `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews --jq '.[-1]'` to get body and submitted_at
+            4. Fetch PR comments after the last review with `gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments --jq '[.[] | select(.created_at > "LAST_REVIEW_SUBMITTED_AT")]'`. If comments exist, treat them as user rebuttals/explanations and factor them into the review
+            5. For issues from the previous review, only verify resolution for files included in this diff. For files not in the diff, mark as "file not changed". For issues the user rebutted via comment, evaluate the rebuttal
+            6. **Only review files included in the diff**. Do not read or review files outside the diff
+            7. If `git diff` fails, fall back to full review mode
+
+            ## Review body format (follow this template exactly)
+
+            Full review body must follow these sections in order:
+
+            1) "## Code Review" heading
+            2) "### Summary" — 1-2 sentence summary of all changes
+            3) "### Positives" — 1-3 good patterns, code quality, or design decisions
+            4) "### Issues" — If none, write "No issues found". Otherwise, classify by severity:
+               - "#### Critical (blocks merge)" items
+               - "#### Important (recommended fix)" items
+               - "#### Suggestion (optional)" items
+               - Each item format: "- `filename:line` — description". Use code blocks if a code example is needed
+            5) "### Verdict" — "APPROVED" or "CHANGES REQUESTED (reason)"
+
+            Incremental review body must follow these sections in order:
+
+            1) "## Incremental Review (vs. previous review)" heading
+            2) "### Previous issue status" — checkbox format (- [x] resolved / - [ ] unresolved)
+            3) "### New issues" — same Critical/Important/Suggestion severity format as above
+            4) "### Verdict" — "APPROVED" or "CHANGES REQUESTED (reason)"
+
+            ## Review criteria
+            - **Critical**: Bugs, security vulnerabilities, data loss risks, build failures
+            - **Important**: Performance issues, type safety, missing error handling, convention violations
+            - **Suggestion**: Naming improvements, code style, refactoring proposals
+            - Focus on **logic and behavior**. Do not flag syntax, API, or library usage as an issue unless you are **certain** it is wrong. The project may use latest library versions with APIs you are unfamiliar with
+            - Always specify issue locations in `filename:line` format
+            - If only Suggestions exist, APPROVE. If any Critical issue exists, CHANGES REQUESTED
+
+            ## Output
+            Output the review result in the format above.
+            The verdict section must include the English keyword "APPROVED" or "CHANGES REQUESTED".
+            (e.g., "APPROVED", "CHANGES REQUESTED — reason")
+            Do NOT run gh pr review, gh pr comment, or any direct posting commands.
+
+            ## Forbidden actions
+            - No memory saving/configuration operations
+            - No reading the entire diff at once
+            - No running `gh pr review`, `gh pr comment`, or any direct posting commands
+            - No intermediate planning/approval request output — execute commands directly and output results only
+            - No reading `.github/screenshots/*` files (binary)
+            - No raising issues for files not included in the diff — code outside the PR scope is not subject to review
+
+            ## Response rules
+            - Write the review in {{REVIEW_LANGUAGE}}. Keep technical terms and code identifiers in their original form.
+            - Include at end of review body: **Token usage**: ~N input tokens / ~N output tokens
+
+      - name: Submit review decision
+        if: github.event_name == 'pull_request' && steps.token-check.outputs.has_token == 'true'
+        env:
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$EXECUTION_FILE" ] || [ ! -f "$EXECUTION_FILE" ]; then
+            echo "::error::No execution_file output from Claude Code Action"
+            exit 1
+          fi
+
+          cat > /tmp/parse_review.py << 'PYEOF'
+          import json, sys
+
+          with open(sys.argv[1]) as f:
+              data = json.load(f)
+
+          if isinstance(data, list):
+              for item in reversed(data):
+                  if isinstance(item, dict) and item.get("result"):
+                      data = item
+                      break
+              else:
+                  print("::error::Could not find result in execution_file", file=sys.stderr)
+                  sys.exit(1)
+
+          result = data.get("result", "") if isinstance(data, dict) else ""
+          if not result:
+              print("::error::Review result is empty", file=sys.stderr)
+              sys.exit(1)
+
+          with open("/tmp/review-body.md", "w") as out:
+              out.write(result)
+
+          if "CHANGES_REQUESTED" in result or "CHANGES REQUESTED" in result:
+              print("CHANGES_REQUESTED")
+          elif "APPROVED" in result:
+              print("APPROVED")
+          else:
+              print("COMMENT")
+          PYEOF
+
+          VERDICT=$(python3 /tmp/parse_review.py "$EXECUTION_FILE")
+          if [ $? -ne 0 ]; then
+            exit 1
+          fi
+
+          echo "Verdict: $VERDICT"
+
+          if [ "$VERDICT" = "APPROVED" ]; then
+            gh pr review "$PR_NUMBER" --approve --body-file /tmp/review-body.md
+          elif [ "$VERDICT" = "CHANGES_REQUESTED" ]; then
+            gh pr review "$PR_NUMBER" --request-changes --body-file /tmp/review-body.md
+          else
+            gh pr comment "$PR_NUMBER" --body-file /tmp/review-body.md
+          fi
