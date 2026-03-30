@@ -1,6 +1,6 @@
 #!/bin/bash
 # doc-check.sh — CLAUDE.md 참조 경로 무결성 검사
-# 사용: sh scripts/doc-check.sh
+# 사용: bash scripts/doc-check.sh
 # exit 0: all valid, exit 1: broken references found
 
 set -uo pipefail
@@ -10,18 +10,24 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 CLAUDE_MD="CLAUDE.md"
+
+if [ ! -f "$CLAUDE_MD" ]; then
+  printf "${RED}CLAUDE.md not found${NC}\n"
+  exit 1
+fi
+
+printf "Checking references in %s...\n" "$CLAUDE_MD"
+
+# Extract paths to temp file
+TMPFILE=$(mktemp)
+trap 'rm -f "$TMPFILE"' EXIT
+
+grep -oE '`[^`]+`' "$CLAUDE_MD" | sed 's/`//g' | sort -u > "$TMPFILE"
+
 TOTAL=0
 VALID=0
 BROKEN=0
 
-if [ ! -f "$CLAUDE_MD" ]; then
-  echo -e "${RED}CLAUDE.md not found${NC}"
-  exit 1
-fi
-
-echo "Checking references in $CLAUDE_MD..."
-
-# Extract paths from backticks and markdown links
 while IFS= read -r path; do
   # Skip empty, URLs, placeholders, and common false positives
   [[ -z "$path" ]] && continue
@@ -36,17 +42,16 @@ while IFS= read -r path; do
     VALID=$((VALID + 1))
   else
     BROKEN=$((BROKEN + 1))
-    echo -e "  ${RED}✗${NC} $path"
+    printf "  ${RED}✗${NC} %s\n" "$path"
   fi
-done < <(grep -oE '`[^`]+`' "$CLAUDE_MD" | sed 's/`//g' | sort -u)
+done < "$TMPFILE"
 
-echo ""
-echo "Results: $TOTAL references checked, $VALID valid, $BROKEN broken"
+printf "\nResults: %d references checked, %d valid, %d broken\n" "$TOTAL" "$VALID" "$BROKEN"
 
 if [ "$BROKEN" -gt 0 ]; then
-  echo -e "${RED}Found $BROKEN broken references${NC}"
+  printf "${RED}Found %d broken references${NC}\n" "$BROKEN"
   exit 1
 else
-  echo -e "${GREEN}All references valid${NC}"
+  printf "${GREEN}All references valid${NC}\n"
   exit 0
 fi
