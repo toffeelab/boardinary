@@ -8,8 +8,8 @@
  * @type {import("eslint").Linter.Config[]}
  */
 export const boardinaryRules = [
-  // 1. data-access 외부에서 DB 직접 import 금지
-  //    data-access/는 예정된 레이어. 현재 actions/에서 직접 사용 중이나 향후 분리 예정.
+  // 1+3. DB 직접 import 금지 + apps/ 간 직접 import 금지 (통합)
+  //       같은 files 패턴에서 no-restricted-imports를 두 번 정의하면 뒤의 것만 적용되므로 통합 필수.
   {
     files: ["apps/web/src/**/*.{ts,tsx}"],
     ignores: [
@@ -33,6 +33,11 @@ export const boardinaryRules = [
               message:
                 "Drizzle ORM은 data-access/db 레이어에서만 사용하세요. → ARCHITECTURE.md#레이어-구조",
             },
+            {
+              group: ["../../apps/api/*", "../../apps/docs/*", "../../../apps/api/*", "../../../apps/docs/*"],
+              message:
+                "apps/ 간 직접 import 금지. 공유 코드는 packages/로 추출하세요. → ARCHITECTURE.md#불변-조건",
+            },
           ],
         },
       ],
@@ -48,25 +53,6 @@ export const boardinaryRules = [
         "error",
         {
           allow: ["warn", "error"],
-        },
-      ],
-    },
-  },
-
-  // 3. apps/ 간 직접 import 금지 — 공유 코드는 packages/로 추출
-  {
-    files: ["apps/web/src/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["../../apps/api/*", "../../apps/docs/*", "../../../apps/api/*", "../../../apps/docs/*"],
-              message:
-                "apps/ 간 직접 import 금지. 공유 코드는 packages/로 추출하세요. → ARCHITECTURE.md#불변-조건",
-            },
-          ],
         },
       ],
     },
