@@ -6,7 +6,7 @@
 
 **Architecture:** 새 노드 타입은 기존 커스텀 노드 패턴을 따라 추가. 템플릿은 `StoryboardContentV1` JSON으로 코드에 내장. 스토리보드 생성 시 템플릿 선택 → content 초기값 설정. 에디터 내 적용은 기존 노드에 템플릿 노드를 오프셋하여 추가.
 
-**Tech Stack:** 기존 @xyflow/react + @repo/types 확장. 추가 의존성 없음.
+**Tech Stack:** 기존 @xyflow/react + @repo/types 확장. vitest (테스트).
 
 **Spec:** `docs/superpowers/specs/2026-03-30-phase2a-templates-nodes.md`
 
@@ -16,18 +16,29 @@
 
 ### 신규 파일
 ```
-apps/web/src/components/storyboard/
-├── nodes/
-│   ├── dialogue-node.tsx         # 대사 커스텀 노드
-│   ├── condition-node.tsx        # 조건 커스텀 노드
-│   └── note-node.tsx             # 메모 커스텀 노드
-├── panels/
-│   └── template-browser.tsx      # 템플릿 선택 모달
-└── templates/
-    ├── index.ts                  # 템플릿 레지스트리 + 인터페이스
-    ├── rpg.ts                    # RPG 템플릿
-    ├── action-fps.ts             # 액션/FPS 템플릿
-    └── puzzle.ts                 # 퍼즐 템플릿
+apps/web/
+├── vitest.config.ts              # vitest 설정
+├── src/
+│   ├── components/storyboard/
+│   │   ├── nodes/
+│   │   │   ├── dialogue-node.tsx
+│   │   │   ├── condition-node.tsx
+│   │   │   └── note-node.tsx
+│   │   ├── panels/
+│   │   │   └── template-browser.tsx
+│   │   ├── templates/
+│   │   │   ├── index.ts
+│   │   │   ├── rpg.ts
+│   │   │   ├── action-fps.ts
+│   │   │   └── puzzle.ts
+│   │   └── hooks/
+│   │       └── __tests__/
+│   │           └── use-edge-validation.test.ts
+│   ├── lib/
+│   │   └── __tests__/
+│   │       └── content-migration.test.ts
+│   └── test/
+│       └── setup.ts              # vitest setup
 ```
 
 ### 수정 파일
@@ -41,6 +52,152 @@ apps/web/src/components/storyboard/panels/property-panel.tsx → 새 타입별 U
 apps/web/src/components/storyboard/panels/node-list-panel.tsx → 새 타입 그룹
 apps/web/src/components/storyboard/editor.tsx → 템플릿 적용 로직
 apps/web/src/app/dashboard/[orgSlug]/projects/[slug]/storyboards/new/page.tsx → 템플릿 선택
+```
+
+---
+
+## Task 0: 테스트 인프라 (vitest 세팅 + 기존 로직 테스트)
+
+**Files:**
+- Modify: `apps/web/package.json`
+- Create: `apps/web/vitest.config.ts`
+- Create: `apps/web/src/test/setup.ts`
+- Create: `apps/web/src/lib/__tests__/content-migration.test.ts`
+- Create: `apps/web/src/components/storyboard/hooks/__tests__/use-edge-validation.test.ts`
+
+- [ ] **Step 1: vitest 설치**
+
+```bash
+pnpm --filter web add -D vitest @vitejs/plugin-react
+```
+
+- [ ] **Step 2: vitest.config.ts 생성**
+
+`apps/web/vitest.config.ts`:
+```ts
+import { defineConfig } from "vitest/config";
+import path from "path";
+
+export default defineConfig({
+  test: {
+    environment: "node",
+    globals: true,
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+  },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+      "@repo/types": path.resolve(__dirname, "../../packages/types/src"),
+    },
+  },
+});
+```
+
+- [ ] **Step 3: test setup**
+
+`apps/web/src/test/setup.ts`:
+```ts
+// vitest global setup
+```
+
+- [ ] **Step 4: package.json에 test 스크립트 추가**
+
+```json
+"test": "vitest run",
+"test:watch": "vitest"
+```
+
+- [ ] **Step 5: content-migration.test.ts — 기존 로직 테스트**
+
+```ts
+import { describe, it, expect } from "vitest";
+import { migrateContent } from "@/lib/content-migration";
+
+describe("migrateContent", () => {
+  it("빈 객체 → 기본 구조", () => {
+    const result = migrateContent({});
+    expect(result.version).toBe(1);
+    expect(result.nodes).toEqual([]);
+    expect(result.edges).toEqual([]);
+  });
+
+  it("null/undefined → 기본 구조", () => {
+    expect(migrateContent(null).nodes).toEqual([]);
+    expect(migrateContent(undefined).nodes).toEqual([]);
+  });
+
+  it("유효한 v1 content 보존", () => {
+    const content = {
+      version: 1,
+      viewport: { x: 10, y: 20, zoom: 1.5 },
+      nodes: [
+        { id: "n1", type: "scene", position: { x: 0, y: 0 }, data: { title: "test" } },
+      ],
+      edges: [{ id: "e1", source: "n1", target: "n2" }],
+    };
+    const result = migrateContent(content);
+    expect(result.nodes).toHaveLength(1);
+    expect(result.edges).toHaveLength(1);
+    expect(result.viewport.zoom).toBe(1.5);
+  });
+
+  it("잘못된 노드 타입 필터링", () => {
+    const content = {
+      version: 1,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        { id: "n1", type: "scene", position: { x: 0, y: 0 }, data: { title: "ok" } },
+        { id: "n2", type: "invalid", position: { x: 0, y: 0 }, data: { title: "bad" } },
+      ],
+      edges: [],
+    };
+    const result = migrateContent(content);
+    expect(result.nodes).toHaveLength(1);
+    expect(result.nodes[0].id).toBe("n1");
+  });
+
+  it("알 수 없는 버전 → 빈 상태", () => {
+    const result = migrateContent({ version: 99 });
+    expect(result.nodes).toEqual([]);
+  });
+});
+```
+
+- [ ] **Step 6: use-edge-validation.test.ts — 엣지 검증 테스트**
+
+```ts
+import { describe, it, expect } from "vitest";
+
+// hasCycle 함수를 직접 테스트하기 위해 모듈에서 export 필요
+// 또는 테스트용으로 로직만 추출
+
+describe("edge validation", () => {
+  it("자기 자신 연결 거부", () => {
+    // isValidConnection({ source: "a", target: "a" }) → false
+  });
+
+  it("중복 연결 거부", () => {
+    // 이미 a→b 엣지 존재 시 동일 연결 거부
+  });
+
+  it("순환 참조 감지", () => {
+    // a→b→c 존재 시 c→a 연결 → 거부
+  });
+
+  it("유효한 연결 허용", () => {
+    // a→b 존재 시 a→c 연결 → 허용
+  });
+});
+```
+
+> **Note**: `hasCycle` 함수를 `use-edge-validation.ts`에서 export하거나, 별도 유틸리티로 추출하여 테스트 가능하게 만들어야 함.
+
+- [ ] **Step 7: 테스트 실행 + 커밋**
+
+```bash
+pnpm --filter web test
+git commit -m "feat: setup vitest + add tests for content-migration and edge-validation"
 ```
 
 ---
@@ -79,9 +236,32 @@ const VALID_NODE_TYPES = new Set([
 
 기존 `as "scene" | "event" | "branch"` 캐스트를 `as StoryboardNode["type"]`로 변경하거나, 타입 캐스트를 제거하고 `n.type!`로 대체.
 
-- [ ] **Step 4: 빌드 확인 + 커밋**
+- [ ] **Step 4: content-migration 테스트 업데이트**
+
+`content-migration.test.ts`에 새 노드 타입 테스트 추가:
+```ts
+it("dialogue 노드 타입 허용", () => {
+  const content = {
+    version: 1,
+    viewport: { x: 0, y: 0, zoom: 1 },
+    nodes: [
+      { id: "n1", type: "dialogue", position: { x: 0, y: 0 }, data: { title: "대사", speaker: "NPC" } },
+    ],
+    edges: [],
+  };
+  const result = migrateContent(content);
+  expect(result.nodes).toHaveLength(1);
+  expect(result.nodes[0].type).toBe("dialogue");
+});
+
+it("condition 노드 타입 허용", () => { ... });
+it("note 노드 타입 허용", () => { ... });
+```
+
+- [ ] **Step 5: 테스트 실행 + 빌드 + 커밋**
 
 ```bash
+pnpm --filter web test
 pnpm build
 git commit -m "feat: extend types with dialogue/condition/note node types"
 ```
@@ -267,9 +447,38 @@ export const templates: StoryboardTemplate[] = [
 - 씬(퍼즐 소개) → 조건(힌트 사용?) → 이벤트(퍼즐 시도) → 조건(정답?) → 분기(다음/재시도) → 씬(클리어)
 - 메모: "난이도별 분기를 추가하세요"
 
-- [ ] **Step 5: 빌드 확인 + 커밋**
+- [ ] **Step 5: 템플릿 구조 검증 테스트**
+
+`apps/web/src/components/storyboard/templates/__tests__/templates.test.ts`:
+```ts
+import { describe, it, expect } from "vitest";
+import { templates } from "../index";
+import { migrateContent } from "@/lib/content-migration";
+
+describe("genre templates", () => {
+  it.each(templates)("$name 템플릿이 유효한 StoryboardContentV1 구조", (template) => {
+    expect(template.id).toBeTruthy();
+    expect(template.content.version).toBe(1);
+    expect(template.content.nodes.length).toBeGreaterThan(0);
+    expect(template.content.edges.length).toBeGreaterThan(0);
+  });
+
+  it.each(templates)("$name 템플릿이 migrateContent를 통과", (template) => {
+    const migrated = migrateContent(template.content);
+    expect(migrated.nodes.length).toBe(template.content.nodes.length);
+  });
+
+  it("3개 템플릿 존재", () => {
+    expect(templates).toHaveLength(3);
+  });
+});
+```
+
+- [ ] **Step 6: 테스트 실행 + 빌드 + 커밋**
 
 ```bash
+pnpm --filter web test
+pnpm --filter web build
 git commit -m "feat: add genre templates (RPG, Action/FPS, Puzzle)"
 ```
 
@@ -394,11 +603,14 @@ git commit -m "chore: Phase 2a templates + custom nodes complete"
 ## 태스크 의존성
 
 ```
-Task 1 (타입 확장) → Task 2 (대사) → Task 3 (조건+메모) → Task 4 (패널)
-                                                              ↓
-Task 5 (템플릿 JSON) → Task 6 (브라우저) → Task 7 (에디터 연동) → Task 8 (생성 페이지) → Task 9 (검증)
+Task 0 (vitest 세팅) → Task 1 (타입 확장 + 테스트) → Task 2 (대사) → Task 3 (조건+메모) → Task 4 (패널)
+                                                                                              ↓
+Task 5 (템플릿 JSON + 테스트) → Task 6 (브라우저) → Task 7 (에디터 연동) → Task 8 (생성 페이지) → Task 9 (검증)
 ```
 
 ## 의존성 추가
 
-없음. 기존 라이브러리만 사용.
+| 패키지 | 용도 |
+|--------|------|
+| `vitest` | 테스트 프레임워크 |
+| `@vitejs/plugin-react` | vitest React 지원 |
