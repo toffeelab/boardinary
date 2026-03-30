@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import type { Edge, Connection, IsValidConnection } from "@xyflow/react";
 
-function hasCycle(edges: Edge[], source: string, target: string): boolean {
+export function hasCycle(edges: Edge[], source: string, target: string): boolean {
   const adj = new Map<string, string[]>();
   for (const edge of edges) {
     if (!adj.has(edge.source)) adj.set(edge.source, []);
