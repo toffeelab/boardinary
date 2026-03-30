@@ -37,7 +37,7 @@ interface CanvasProps {
     viewport: Viewport,
   ) => void;
   onNodeDrop?: (
-    type: "scene" | "event" | "branch",
+    type: "scene" | "event" | "branch" | "dialogue" | "condition" | "note",
     position: { x: number; y: number },
   ) => void;
 }
@@ -72,7 +72,10 @@ export function Canvas({
         y: event.clientY,
       });
 
-      onNodeDrop?.(type as "scene" | "event" | "branch", position);
+      onNodeDrop?.(
+        type as "scene" | "event" | "branch" | "dialogue" | "condition" | "note",
+        position,
+      );
     },
     [screenToFlowPosition, onNodeDrop],
   );

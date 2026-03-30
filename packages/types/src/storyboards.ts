@@ -21,6 +21,7 @@ export interface CreateStoryboardDto {
   name: string;
   description?: string;
   genre?: string;
+  content?: Record<string, unknown>;
 }
 
 export interface StoryboardNodeData {
@@ -29,11 +30,14 @@ export interface StoryboardNodeData {
   tags?: string[];
   color?: string;
   choices?: Array<{ id: string; label: string }>;
+  speaker?: string;
+  dialogueText?: string;
+  conditionExpr?: string;
 }
 
 export interface StoryboardNode {
   id: string;
-  type: "scene" | "event" | "branch" | "group";
+  type: "scene" | "event" | "branch" | "group" | "dialogue" | "condition" | "note";
   position: { x: number; y: number };
   width?: number;
   height?: number;

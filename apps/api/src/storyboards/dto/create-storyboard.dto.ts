@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength } from "class-validator";
+import { IsString, IsOptional, MaxLength, IsObject } from "class-validator";
 import type { CreateStoryboardDto as ICreateStoryboardDto } from "@repo/types";
 
 export class CreateStoryboardDto implements ICreateStoryboardDto {
@@ -15,4 +15,8 @@ export class CreateStoryboardDto implements ICreateStoryboardDto {
   @IsString()
   @MaxLength(50)
   genre?: string;
+
+  @IsOptional()
+  @IsObject()
+  content?: Record<string, unknown>;
 }

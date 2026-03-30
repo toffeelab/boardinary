@@ -16,6 +16,9 @@ const NODE_TYPE_CONFIG = {
   scene: { label: "씬", color: "#8b5cf6" },
   event: { label: "이벤트", color: "#10b981" },
   branch: { label: "분기", color: "#f59e0b" },
+  dialogue: { label: "대사", color: "#3b82f6" },
+  condition: { label: "조건", color: "#ef4444" },
+  note: { label: "메모", color: "#6b7280" },
 } as const;
 
 type NodeType = keyof typeof NODE_TYPE_CONFIG;
@@ -28,6 +31,9 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
       scene: [],
       event: [],
       branch: [],
+      dialogue: [],
+      condition: [],
+      note: [],
     };
     for (const node of nodes) {
       const type = node.type as NodeType;
@@ -44,7 +50,7 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
     <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
       <div className="flex items-center justify-between px-4 py-3">
         <h2 className="truncate text-sm font-semibold text-foreground">
-          노드 목록
+          요소 목록
         </h2>
         <button
           type="button"
@@ -59,7 +65,7 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
       <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-2">
         {!hasNodes && (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-            툴바에서 노드를 추가하세요
+            툴바에서 요소를 추가하세요
           </p>
         )}
         {hasNodes &&

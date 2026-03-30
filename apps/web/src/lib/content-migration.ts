@@ -10,7 +10,15 @@ const EMPTY_CONTENT: StoryboardContentV1 = {
   edges: [],
 };
 
-const VALID_NODE_TYPES = new Set(["scene", "event", "branch", "group"]);
+const VALID_NODE_TYPES = new Set([
+  "scene",
+  "event",
+  "branch",
+  "group",
+  "dialogue",
+  "condition",
+  "note",
+]);
 
 /** Sanitize a single node, ensuring new optional fields are valid */
 function sanitizeNode(raw: Record<string, unknown>): StoryboardNode | null {

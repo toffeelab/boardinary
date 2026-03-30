@@ -38,6 +38,8 @@ import {
   type AlignDirection,
   type DistributeAxis,
 } from "./panels/context-menu";
+import { TemplateBrowser } from "./panels/template-browser";
+import type { StoryboardTemplate } from "./templates";
 
 interface StoryboardEditorProps {
   storyboardId: string;
@@ -47,24 +49,48 @@ interface StoryboardEditorProps {
   storyboardName: string;
 }
 
+type AddableNodeType =
+  | "scene"
+  | "event"
+  | "branch"
+  | "dialogue"
+  | "condition"
+  | "note";
+
 /** Default data factories per node type */
-function createDefaultNodeData(
-  type: "scene" | "event" | "branch",
-): StoryboardNodeData {
+function createDefaultNodeData(type: AddableNodeType): StoryboardNodeData {
   const base: StoryboardNodeData = { title: "" };
-  if (type === "scene") {
-    base.title = "새 씬";
-    base.color = "#8b5cf6";
-  } else if (type === "event") {
-    base.title = "새 이벤트";
-    base.color = "#10b981";
-  } else {
-    base.title = "새 분기";
-    base.color = "#f59e0b";
-    base.choices = [
-      { id: crypto.randomUUID(), label: "선택지 1" },
-      { id: crypto.randomUUID(), label: "선택지 2" },
-    ];
+  switch (type) {
+    case "scene":
+      base.title = "새 씬";
+      base.color = "#8b5cf6";
+      break;
+    case "event":
+      base.title = "새 이벤트";
+      base.color = "#10b981";
+      break;
+    case "branch":
+      base.title = "새 분기";
+      base.color = "#f59e0b";
+      base.choices = [
+        { id: crypto.randomUUID(), label: "선택지 1" },
+        { id: crypto.randomUUID(), label: "선택지 2" },
+      ];
+      break;
+    case "dialogue":
+      base.title = "새 대사";
+      base.color = "#3b82f6";
+      base.speaker = "";
+      base.dialogueText = "";
+      break;
+    case "condition":
+      base.title = "새 조건";
+      base.color = "#ef4444";
+      base.conditionExpr = "";
+      break;
+    case "note":
+      base.title = "새 메모";
+      break;
   }
   return base;
 }
@@ -260,7 +286,7 @@ function EditorInner({
 
   // Add node from toolbar
   const handleAddNode = useCallback(
-    (type: "scene" | "event" | "branch") => {
+    (type: AddableNodeType) => {
       pushSnapshot(nodesRef.current, edgesRef.current);
 
       const viewport = reactFlowInstance.getViewport();
@@ -271,11 +297,14 @@ function EditorInner({
       const centerX = (-viewport.x + width / 2) / viewport.zoom;
       const centerY = (-viewport.y + height / 2) / viewport.zoom;
 
+      const maxZ = Math.max(0, ...nodesRef.current.map((n) => n.zIndex ?? 0));
+
       const newNode: Node = {
         id: crypto.randomUUID(),
         type,
         position: { x: centerX - 100, y: centerY - 50 },
         data: createDefaultNodeData(type) as unknown as Record<string, unknown>,
+        zIndex: maxZ + 1,
       };
 
       setNodes((nds) => {
@@ -283,17 +312,21 @@ function EditorInner({
         markDirtyAndSave(updated, edgesRef.current);
         return updated;
       });
+
+      setSelectedNodeId(newNode.id);
     },
-    [pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave],
+    [pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave, setSelectedNodeId],
   );
 
   // Add node via drag-and-drop on canvas
   const handleNodeDrop = useCallback(
     (
-      type: "scene" | "event" | "branch",
+      type: AddableNodeType,
       position: { x: number; y: number },
     ) => {
       pushSnapshot(nodesRef.current, edgesRef.current);
+
+      const maxZ = Math.max(0, ...nodesRef.current.map((n) => n.zIndex ?? 0));
 
       const newNode: Node = {
         id: crypto.randomUUID(),
@@ -303,6 +336,7 @@ function EditorInner({
           string,
           unknown
         >,
+        zIndex: maxZ + 1,
       };
 
       setNodes((nds) => {
@@ -310,8 +344,10 @@ function EditorInner({
         markDirtyAndSave(updated, edgesRef.current);
         return updated;
       });
+
+      setSelectedNodeId(newNode.id);
     },
-    [pushSnapshot, setNodes, markDirtyAndSave],
+    [pushSnapshot, setNodes, markDirtyAndSave, setSelectedNodeId],
   );
 
   // Property panel node data change
@@ -509,6 +545,75 @@ function EditorInner({
     onGroup: handleGroupNodes,
     onUngroup: handleUngroupNodes,
   });
+
+  // Template browser state
+  const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
+
+  const handleApplyTemplate = useCallback(
+    (template: StoryboardTemplate) => {
+      pushSnapshot(nodesRef.current, edgesRef.current);
+
+      const currentNodes = nodesRef.current;
+
+      // Calculate bounding box of existing nodes
+      let offsetX = 0;
+      if (currentNodes.length > 0) {
+        let maxX = -Infinity;
+        for (const node of currentNodes) {
+          const w = node.measured?.width ?? node.width ?? 180;
+          maxX = Math.max(maxX, node.position.x + w);
+        }
+        offsetX = maxX + 200;
+      }
+
+      // Build ID mapping: old template ID -> new unique ID
+      const idMap = new Map<string, string>();
+      for (const tNode of template.content.nodes) {
+        idMap.set(tNode.id, crypto.randomUUID());
+      }
+
+      // Clone template nodes with new IDs and offset positions
+      const maxZ = Math.max(0, ...currentNodes.map((n) => n.zIndex ?? 0));
+      const clonedNodes: Node[] = template.content.nodes.map((tNode, i) => ({
+        id: idMap.get(tNode.id)!,
+        type: tNode.type,
+        position: {
+          x: tNode.position.x + offsetX,
+          y: tNode.position.y,
+        },
+        data: { ...tNode.data } as unknown as Record<string, unknown>,
+        zIndex: maxZ + 1 + i,
+        ...(tNode.width != null ? { width: tNode.width } : {}),
+        ...(tNode.height != null ? { height: tNode.height } : {}),
+        ...(tNode.parentId && idMap.has(tNode.parentId)
+          ? { parentId: idMap.get(tNode.parentId)!, extent: "parent" as const }
+          : {}),
+      }));
+
+      // Clone template edges with new IDs, update source/target
+      const clonedEdges: Edge[] = template.content.edges.map((tEdge) => ({
+        id: crypto.randomUUID(),
+        source: idMap.get(tEdge.source) ?? tEdge.source,
+        target: idMap.get(tEdge.target) ?? tEdge.target,
+        type: "labeled",
+        ...(tEdge.sourceHandle ? { sourceHandle: tEdge.sourceHandle } : {}),
+        ...(tEdge.label ? { label: tEdge.label } : {}),
+      }));
+
+      setNodes((nds) => {
+        const updated = [...nds, ...clonedNodes];
+        setEdges((eds) => {
+          const updatedEdges = [...eds, ...clonedEdges];
+          markDirtyAndSave(updated, updatedEdges);
+          return updatedEdges;
+        });
+        return updated;
+      });
+
+      setIsTemplateBrowserOpen(false);
+    },
+    [pushSnapshot, setNodes, setEdges, markDirtyAndSave],
+  );
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -813,7 +918,17 @@ function EditorInner({
       })()}
 
       {/* Toolbar */}
-      <Toolbar onAddNode={handleAddNode} />
+      <Toolbar
+        onAddNode={handleAddNode}
+        onOpenTemplates={() => setIsTemplateBrowserOpen(true)}
+      />
+
+      {/* Template browser modal */}
+      <TemplateBrowser
+        open={isTemplateBrowserOpen}
+        onClose={() => setIsTemplateBrowserOpen(false)}
+        onApply={handleApplyTemplate}
+      />
     </div>
   );
 }
