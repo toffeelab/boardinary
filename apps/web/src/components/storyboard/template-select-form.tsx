@@ -95,7 +95,7 @@ export function TemplateSelectForm({
                 {template.description}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                노드 {template.nodeCount}개
+                요소 {template.nodeCount}개
               </p>
             </button>
           ))}

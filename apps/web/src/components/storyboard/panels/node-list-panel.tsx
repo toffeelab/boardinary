@@ -50,7 +50,7 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
     <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
       <div className="flex items-center justify-between px-4 py-3">
         <h2 className="truncate text-sm font-semibold text-foreground">
-          노드 목록
+          요소 목록
         </h2>
         <button
           type="button"
@@ -65,7 +65,7 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
       <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-2">
         {!hasNodes && (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-            툴바에서 노드를 추가하세요
+            툴바에서 요소를 추가하세요
           </p>
         )}
         {hasNodes &&

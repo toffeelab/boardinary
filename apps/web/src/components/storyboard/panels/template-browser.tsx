@@ -51,7 +51,7 @@ export function TemplateBrowser({
         <DialogHeader>
           <DialogTitle>템플릿 선택</DialogTitle>
           <DialogDescription>
-            장르별 템플릿을 선택하면 현재 캔버스에 노드가 추가됩니다.
+            장르별 템플릿을 선택하면 현재 캔버스에 요소가 추가됩니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -77,7 +77,7 @@ export function TemplateBrowser({
                 {template.description}
               </p>
               <p className="text-xs text-muted-foreground">
-                노드 {template.nodeCount}개
+                요소 {template.nodeCount}개
               </p>
             </button>
           ))}

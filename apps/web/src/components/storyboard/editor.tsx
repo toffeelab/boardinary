@@ -297,11 +297,14 @@ function EditorInner({
       const centerX = (-viewport.x + width / 2) / viewport.zoom;
       const centerY = (-viewport.y + height / 2) / viewport.zoom;
 
+      const maxZ = Math.max(0, ...nodesRef.current.map((n) => n.zIndex ?? 0));
+
       const newNode: Node = {
         id: crypto.randomUUID(),
         type,
         position: { x: centerX - 100, y: centerY - 50 },
         data: createDefaultNodeData(type) as unknown as Record<string, unknown>,
+        zIndex: maxZ + 1,
       };
 
       setNodes((nds) => {
@@ -309,8 +312,10 @@ function EditorInner({
         markDirtyAndSave(updated, edgesRef.current);
         return updated;
       });
+
+      setSelectedNodeId(newNode.id);
     },
-    [pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave],
+    [pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave, setSelectedNodeId],
   );
 
   // Add node via drag-and-drop on canvas
@@ -321,6 +326,8 @@ function EditorInner({
     ) => {
       pushSnapshot(nodesRef.current, edgesRef.current);
 
+      const maxZ = Math.max(0, ...nodesRef.current.map((n) => n.zIndex ?? 0));
+
       const newNode: Node = {
         id: crypto.randomUUID(),
         type,
@@ -329,6 +336,7 @@ function EditorInner({
           string,
           unknown
         >,
+        zIndex: maxZ + 1,
       };
 
       setNodes((nds) => {
@@ -336,8 +344,10 @@ function EditorInner({
         markDirtyAndSave(updated, edgesRef.current);
         return updated;
       });
+
+      setSelectedNodeId(newNode.id);
     },
-    [pushSnapshot, setNodes, markDirtyAndSave],
+    [pushSnapshot, setNodes, markDirtyAndSave, setSelectedNodeId],
   );
 
   // Property panel node data change
@@ -563,7 +573,8 @@ function EditorInner({
       }
 
       // Clone template nodes with new IDs and offset positions
-      const clonedNodes: Node[] = template.content.nodes.map((tNode) => ({
+      const maxZ = Math.max(0, ...currentNodes.map((n) => n.zIndex ?? 0));
+      const clonedNodes: Node[] = template.content.nodes.map((tNode, i) => ({
         id: idMap.get(tNode.id)!,
         type: tNode.type,
         position: {
@@ -571,6 +582,7 @@ function EditorInner({
           y: tNode.position.y,
         },
         data: { ...tNode.data } as unknown as Record<string, unknown>,
+        zIndex: maxZ + 1 + i,
         ...(tNode.width != null ? { width: tNode.width } : {}),
         ...(tNode.height != null ? { height: tNode.height } : {}),
         ...(tNode.parentId && idMap.has(tNode.parentId)

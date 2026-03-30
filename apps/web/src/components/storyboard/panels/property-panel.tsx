@@ -111,7 +111,7 @@ export function PropertyPanel({
         <Separator />
         <div className="flex min-w-0 flex-1 items-center justify-center">
           <p className="whitespace-nowrap text-sm text-muted-foreground">
-            노드를 선택하세요
+            요소를 선택하세요
           </p>
         </div>
       </aside>
@@ -144,7 +144,7 @@ export function PropertyPanel({
             id="node-title"
             value={nodeData.title}
             onChange={(e) => handleChange("title", e.target.value)}
-            placeholder="노드 제목"
+            placeholder="제목"
           />
         </div>
 
@@ -203,7 +203,7 @@ export function PropertyPanel({
               id="node-description"
               value={nodeData.description ?? ""}
               onChange={(e) => handleChange("description", e.target.value)}
-              placeholder="노드 설명"
+              placeholder="설명"
               rows={nodeType === "note" ? 5 : 3}
             />
           </div>
