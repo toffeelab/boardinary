@@ -38,6 +38,8 @@ import {
   type AlignDirection,
   type DistributeAxis,
 } from "./panels/context-menu";
+import { TemplateBrowser } from "./panels/template-browser";
+import type { StoryboardTemplate } from "./templates";
 
 interface StoryboardEditorProps {
   storyboardId: string;
@@ -534,6 +536,73 @@ function EditorInner({
     onUngroup: handleUngroupNodes,
   });
 
+  // Template browser state
+  const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
+
+  const handleApplyTemplate = useCallback(
+    (template: StoryboardTemplate) => {
+      pushSnapshot(nodesRef.current, edgesRef.current);
+
+      const currentNodes = nodesRef.current;
+
+      // Calculate bounding box of existing nodes
+      let offsetX = 0;
+      if (currentNodes.length > 0) {
+        let maxX = -Infinity;
+        for (const node of currentNodes) {
+          const w = node.measured?.width ?? node.width ?? 180;
+          maxX = Math.max(maxX, node.position.x + w);
+        }
+        offsetX = maxX + 200;
+      }
+
+      // Build ID mapping: old template ID -> new unique ID
+      const idMap = new Map<string, string>();
+      for (const tNode of template.content.nodes) {
+        idMap.set(tNode.id, crypto.randomUUID());
+      }
+
+      // Clone template nodes with new IDs and offset positions
+      const clonedNodes: Node[] = template.content.nodes.map((tNode) => ({
+        id: idMap.get(tNode.id)!,
+        type: tNode.type,
+        position: {
+          x: tNode.position.x + offsetX,
+          y: tNode.position.y,
+        },
+        data: { ...tNode.data } as unknown as Record<string, unknown>,
+        ...(tNode.width != null ? { width: tNode.width } : {}),
+        ...(tNode.height != null ? { height: tNode.height } : {}),
+        ...(tNode.parentId && idMap.has(tNode.parentId)
+          ? { parentId: idMap.get(tNode.parentId)!, extent: "parent" as const }
+          : {}),
+      }));
+
+      // Clone template edges with new IDs, update source/target
+      const clonedEdges: Edge[] = template.content.edges.map((tEdge) => ({
+        id: crypto.randomUUID(),
+        source: idMap.get(tEdge.source) ?? tEdge.source,
+        target: idMap.get(tEdge.target) ?? tEdge.target,
+        type: "labeled",
+        ...(tEdge.sourceHandle ? { sourceHandle: tEdge.sourceHandle } : {}),
+        ...(tEdge.label ? { label: tEdge.label } : {}),
+      }));
+
+      setNodes((nds) => {
+        const updated = [...nds, ...clonedNodes];
+        setEdges((eds) => {
+          const updatedEdges = [...eds, ...clonedEdges];
+          markDirtyAndSave(updated, updatedEdges);
+          return updatedEdges;
+        });
+        return updated;
+      });
+
+      setIsTemplateBrowserOpen(false);
+    },
+    [pushSnapshot, setNodes, setEdges, markDirtyAndSave],
+  );
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -837,7 +906,17 @@ function EditorInner({
       })()}
 
       {/* Toolbar */}
-      <Toolbar onAddNode={handleAddNode} />
+      <Toolbar
+        onAddNode={handleAddNode}
+        onOpenTemplates={() => setIsTemplateBrowserOpen(true)}
+      />
+
+      {/* Template browser modal */}
+      <TemplateBrowser
+        open={isTemplateBrowserOpen}
+        onClose={() => setIsTemplateBrowserOpen(false)}
+        onApply={handleApplyTemplate}
+      />
     </div>
   );
 }

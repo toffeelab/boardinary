@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid } from "lucide-react";
+import { ClipboardList, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ type StoryboardNodeType =
 
 interface ToolbarProps {
   onAddNode: (type: StoryboardNodeType) => void;
+  onOpenTemplates?: () => void;
 }
 
 const ADD_BUTTONS: {
@@ -42,7 +43,7 @@ const PRESET_LABELS: Record<LayoutPreset, string> = {
   "property-only": "속성만",
 };
 
-export function Toolbar({ onAddNode }: ToolbarProps) {
+export function Toolbar({ onAddNode, onOpenTemplates }: ToolbarProps) {
   const {
     isNodeListOpen,
     toggleNodeList,
@@ -102,6 +103,21 @@ export function Toolbar({ onAddNode }: ToolbarProps) {
           </Button>
         ))}
       </div>
+
+      <div className="mx-2 h-5 w-px bg-border" />
+
+      {onOpenTemplates && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onOpenTemplates}
+          className="gap-1.5"
+        >
+          <ClipboardList className="h-4 w-4" />
+          템플릿
+        </Button>
+      )}
 
       <div className="mx-2 h-5 w-px bg-border" />
 
