@@ -113,6 +113,63 @@ describe("migrateContent", () => {
     expect(result.nodes[1]!.parentId).toBe("node-1");
   });
 
+  it("dialogue 노드 타입 허용", () => {
+    const content = {
+      version: 1,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        {
+          id: "n1",
+          type: "dialogue",
+          position: { x: 0, y: 0 },
+          data: { title: "대사", speaker: "NPC", dialogueText: "안녕하세요" },
+        },
+      ],
+      edges: [],
+    };
+    const result = migrateContent(content);
+    expect(result.nodes).toHaveLength(1);
+    expect(result.nodes[0]!.type).toBe("dialogue");
+  });
+
+  it("condition 노드 타입 허용", () => {
+    const content = {
+      version: 1,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        {
+          id: "n1",
+          type: "condition",
+          position: { x: 0, y: 0 },
+          data: { title: "조건", conditionExpr: "level > 5" },
+        },
+      ],
+      edges: [],
+    };
+    const result = migrateContent(content);
+    expect(result.nodes).toHaveLength(1);
+    expect(result.nodes[0]!.type).toBe("condition");
+  });
+
+  it("note 노드 타입 허용", () => {
+    const content = {
+      version: 1,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      nodes: [
+        {
+          id: "n1",
+          type: "note",
+          position: { x: 0, y: 0 },
+          data: { title: "메모", description: "기획 참고사항" },
+        },
+      ],
+      edges: [],
+    };
+    const result = migrateContent(content);
+    expect(result.nodes).toHaveLength(1);
+    expect(result.nodes[0]!.type).toBe("note");
+  });
+
   it("filters out nodes with missing required fields", () => {
     const content = {
       version: 1,

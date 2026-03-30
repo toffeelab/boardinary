@@ -4,6 +4,7 @@ import { useCallback, useRef } from "react";
 import type { Node, Edge, Viewport } from "@xyflow/react";
 import type {
   StoryboardContentV1,
+  StoryboardNode,
   StoryboardNodeData,
 } from "@repo/types";
 import { useEditorStore } from "@/stores/editor-store";
@@ -22,7 +23,7 @@ function toContentV1(
     viewport: { x: viewport.x, y: viewport.y, zoom: viewport.zoom },
     nodes: nodes.map((n) => ({
       id: n.id,
-      type: (n.type ?? "scene") as "scene" | "event" | "branch",
+      type: (n.type ?? "scene") as StoryboardNode["type"],
       position: { x: n.position.x, y: n.position.y },
       data: n.data as unknown as StoryboardNodeData,
     })),
