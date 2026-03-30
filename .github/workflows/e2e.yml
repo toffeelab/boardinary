@@ -13,7 +13,7 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_DB: intervuddy_test
+          POSTGRES_DB: boardinary_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
@@ -56,7 +56,7 @@ jobs:
 
       - name: Run E2E tests
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/intervuddy_test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/boardinary_test
           AUTH_SECRET: e2e-ci-test-secret
         run: pnpm test:e2e
 

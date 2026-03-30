@@ -1,4 +1,4 @@
-# 병렬 작업 및 Worktree 관리
+# Worktree 기반 병렬 작업 가이드
 
 모든 코드 구현은 worktree에서 수행한다. 메인 디렉토리는 develop의 클린 상태를 유지.
 
@@ -33,23 +33,18 @@
 
 ## 포트 충돌 방지
 
-Turborepo는 `pnpm dev`로 모든 앱을 동시 실행한다. 각 앱은 고유 포트를 사용:
-- `apps/web`: 3000
-- `apps/docs`: 3001
+각 앱의 고유 포트:
+- `apps/web`: 4000
+- `apps/api`: 4001
+- `apps/docs`: 4002
 
 여러 worktree에서 동시에 dev 서버를 실행할 경우:
 
 ```bash
-# 포트 사용 여부 확인
-lsof -i :3000
-
-# 특정 앱만 빈 포트로 dev 서버 실행
-pnpm --filter web dev --port 3002
+lsof -i :4000              # 포트 사용 여부 확인
+pnpm --filter web dev --port 4010   # 빈 포트로 실행
 ```
 
 ## 검증 방법
 
-- **기능 검증**: Playwright E2E 테스트 작성 + `pnpm --filter web test` 통과 필수
-- **빌드 검증**: `pnpm build` 성공 필수 (전체 모노레포)
-- **타입 체크**: `pnpm check-types` 성공 필수
-- **시각적 확인**: 필요 시 MCP (Playwright/Chrome DevTools)로 스크린샷 확인
+상세 체크리스트 → [QUALITY_SCORE.md](QUALITY_SCORE.md)
