@@ -27,8 +27,8 @@ export class BlueprintsController {
   }
 
   @Get(":id")
-  async getBlueprint(@Param("id") id: string) {
-    return this.blueprintsService.getBlueprintById(id);
+  async getBlueprint(@CurrentUserId() userId: string, @Param("id") id: string) {
+    return this.blueprintsService.getBlueprintById(id, userId);
   }
 
   @Post()

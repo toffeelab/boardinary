@@ -2,9 +2,10 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from "@nestjs/common";
 import { db } from "@repo/db";
-import { blueprints } from "@repo/db/schema";
+import { blueprints, orgMembers } from "@repo/db/schema";
 import { eq, and } from "drizzle-orm";
 import { CreateBlueprintDto } from "./dto/create-blueprint.dto";
 import { UpdateBlueprintDto } from "./dto/update-blueprint.dto";
@@ -71,7 +72,7 @@ export class BlueprintsService {
     return [];
   }
 
-  async getBlueprintById(id: string) {
+  async getBlueprintById(id: string, userId?: string) {
     const rows = await db
       .select()
       .from(blueprints)
@@ -82,10 +83,58 @@ export class BlueprintsService {
       throw new NotFoundException("Blueprint not found");
     }
 
-    return rows[0];
+    const blueprint = rows[0]!;
+
+    if (userId !== undefined) {
+      await this.ensureBlueprintAccess(blueprint, userId);
+    }
+
+    return blueprint;
+  }
+
+  async ensureBlueprintAccess(
+    blueprint: {
+      id: string;
+      scope: string;
+      createdBy: string;
+      orgId: string | null;
+    },
+    userId: string,
+  ) {
+    if (blueprint.scope === "personal") {
+      if (blueprint.createdBy !== userId) {
+        throw new ForbiddenException("Not authorized");
+      }
+      return;
+    }
+
+    if (blueprint.scope === "organization") {
+      if (!blueprint.orgId) {
+        throw new ForbiddenException("Not authorized");
+      }
+      const [member] = await db
+        .select()
+        .from(orgMembers)
+        .where(
+          and(
+            eq(orgMembers.orgId, blueprint.orgId),
+            eq(orgMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+      if (!member) {
+        throw new ForbiddenException("Not authorized");
+      }
+    }
   }
 
   async createBlueprint(userId: string, dto: CreateBlueprintDto) {
+    if (dto.scope === "organization" && !dto.orgId) {
+      throw new BadRequestException(
+        "orgId is required for organization-scoped blueprints",
+      );
+    }
+
     const rows = await db
       .insert(blueprints)
       .values({
@@ -109,10 +158,7 @@ export class BlueprintsService {
   async updateBlueprint(id: string, userId: string, dto: UpdateBlueprintDto) {
     const existing = await this.getBlueprintById(id);
 
-    // existing is guaranteed non-undefined: getBlueprintById throws NotFoundException if missing
-    if (existing!.scope === "personal" && existing!.createdBy !== userId) {
-      throw new ForbiddenException("Cannot edit another user's blueprint");
-    }
+    await this.ensureBlueprintAccess(existing!, userId);
 
     const updateData: Record<string, unknown> = {};
     if (dto.name !== undefined) updateData.name = dto.name;
@@ -136,10 +182,7 @@ export class BlueprintsService {
   async deleteBlueprint(id: string, userId: string) {
     const existing = await this.getBlueprintById(id);
 
-    // existing is guaranteed non-undefined: getBlueprintById throws NotFoundException if missing
-    if (existing!.scope === "personal" && existing!.createdBy !== userId) {
-      throw new ForbiddenException("Cannot delete another user's blueprint");
-    }
+    await this.ensureBlueprintAccess(existing!, userId);
 
     await db.delete(blueprints).where(eq(blueprints.id, id));
     return { success: true };
