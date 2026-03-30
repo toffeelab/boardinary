@@ -130,27 +130,51 @@ DEVELOP_BRANCH="develop"
 #!/bin/bash
 # .claude/hooks/_lib/common.sh — 모든 hook이 source하는 공유 유틸
 
-# jq 의존성 체크: 미설치 시 경고 후 통과
+# === jq 의존성 체크 ===
+# 보안 원칙: fail-closed. jq 없으면 보호 hook이 동작할 수 없으므로 차단.
+# PostToolUse(정보 제공용)에서만 통과시키려면 source 전에 HOOK_FAIL_OPEN=1 설정.
 if ! command -v jq &>/dev/null; then
-  echo "WARNING: jq not installed. Hook skipped." >&2
-  exit 0
+  if [ "${HOOK_FAIL_OPEN:-0}" = "1" ]; then
+    echo "WARNING: jq not installed. Hook skipped." >&2
+    exit 0
+  else
+    echo "BLOCKED: jq is required for security hooks. Install: brew install jq (macOS) / apt install jq (Linux)" >&2
+    exit 2
+  fi
 fi
 
-# stdin에서 JSON 읽기
+# === stdin에서 JSON 읽기 ===
 HOOK_INPUT=$(cat)
 
-# 공통 필드 추출 헬퍼
+# JSON 파싱 실패 시 안전한 기본값 (빈 문자열)
+if ! echo "$HOOK_INPUT" | jq empty 2>/dev/null; then
+  if [ "${HOOK_FAIL_OPEN:-0}" = "1" ]; then
+    echo "WARNING: Failed to parse hook input JSON. Hook skipped." >&2
+    exit 0
+  else
+    echo "BLOCKED: Failed to parse hook input JSON." >&2
+    exit 2
+  fi
+fi
+
+# === 공통 필드 추출 헬퍼 ===
 hook_get() {
   echo "$HOOK_INPUT" | jq -r "$1 // empty"
 }
 
-# 표준 차단 함수 (exit 2 + 사유 출력)
+# === 명령어 정규화 (보안 매칭용) ===
+# 프리픽스(env, command, sudo 등) 제거 + 다중 공백 정규화
+hook_normalize_command() {
+  echo "$1" | sed -E 's/^(env[[:space:]]+[A-Z_]+=[^[:space:]]+[[:space:]]+|command[[:space:]]+|sudo[[:space:]]+)*//' | tr -s ' '
+}
+
+# === 표준 차단 함수 (exit 2 + 사유 출력) ===
 hook_block() {
   echo "BLOCKED: $1" >&2
   exit 2
 }
 
-# 표준 경고 함수 (exit 0 + 메시지)
+# === 표준 경고 함수 (exit 0 + 메시지) ===
 hook_warn() {
   echo "WARNING: $1" >&2
 }
@@ -160,35 +184,72 @@ hook_warn() {
 
 ```bash
 #!/bin/bash
+# PreToolUse hook — fail-closed (기본값)
 source "$(dirname "$0")/../_lib/common.sh"
 
 COMMAND=$(hook_get '.tool_input.command')
-# ... 로직
-hook_block "git push --force is not allowed"
+NORMALIZED=$(hook_normalize_command "$COMMAND")
+# ... 정규화된 명령어로 패턴 매칭
 ```
+
+```bash
+#!/bin/bash
+# PostToolUse hook — fail-open (정보 제공용)
+HOOK_FAIL_OPEN=1
+source "$(dirname "$0")/../_lib/common.sh"
+
+FILE_PATH=$(hook_get '.tool_input.file_path')
+# ... lint 실행 (실패해도 차단 안 함)
+```
+
+**보안 설계:**
+
+- **PreToolUse (보호용):** fail-closed 기본값. jq 미설치/JSON 파싱 실패 시 차단 (exit 2)
+- **PostToolUse (정보용):** `HOOK_FAIL_OPEN=1` 설정 시 fail-open. lint 같은 비보안 hook에 사용
+- **`hook_normalize_command`:** `env VAR=x`, `command`, `sudo` 프리픽스 제거 + 공백 정규화로 우회 방지
+- JSON 파싱 실패 시에도 보안 모드에 따라 차단/통과 분기
 
 **확장 시 이점:**
 
 - 새 hook 추가 시 `source common.sh` 한 줄로 jq 체크/파싱 해결
 - jq fallback 전략 변경 시 한 곳만 수정
-- `hook_get`, `hook_block`, `hook_warn` 인터페이스가 hook 간 일관성 보장
+- `hook_get`, `hook_block`, `hook_warn`, `hook_normalize_command` 인터페이스가 hook 간 일관성 보장
 
 ### PreToolUse
 
 #### `block-dangerous-commands.sh`
 
 - **트리거:** `Bash` 도구 호출 시
-- **입력:** stdin JSON에서 `tool_input.command` 추출 (`jq` 사용)
-- **차단 대상:** `git push --force`, `git reset --hard`, `rm -rf /`, `drop table`, `git checkout .` 등
-- **동작:** 매칭 시 exit 2 (BLOCK) + 사유를 stderr로 출력
-- **커스터마이징:** 파일 상단 `BLOCKED_PATTERNS` 배열로 프로젝트별 패턴 추가
+- **입력:** stdin JSON → `hook_get '.tool_input.command'` → `hook_normalize_command`로 정규화
+- **매칭 방식:** 정규화된 명령어에 대해 **정규식(regex)** 매칭. 단순 문자열 포함이 아님
+- **차단 패턴 (기본):**
+
+```bash
+BLOCKED_PATTERNS=(
+  'git push.*(--force|-f|--force-with-lease)'   # force push 전 변형
+  'git push.*--delete'                           # 리모트 브랜치 삭제
+  'git push [^ ]+ :'                             # colon 문법 리모트 삭제
+  'git reset --hard'                             # 히스토리 파괴
+  'git checkout \.'                              # 전체 워킹트리 되돌리기
+  'git clean -[a-z]*f'                           # untracked 파일 강제 삭제
+  'rm -rf /'                                     # 루트 삭제
+  'drop table'                                   # DB 테이블 삭제 (대소문자 무시)
+  'truncate table'                               # DB 테이블 비우기
+  # 프로젝트별 패턴을 여기에 추가
+)
+```
+
+- **동작:** 정규화된 명령어가 패턴에 매칭 시 exit 2 (BLOCK) + 사유를 stderr로 출력
+- **대소문자:** SQL 패턴(`drop table`, `truncate table`)은 case-insensitive 매칭
+- **커스터마이징:** 파일 상단 `BLOCKED_PATTERNS` 배열에 프로젝트별 정규식 추가
 
 #### `warn-main-branch-edit.sh`
 
 - **트리거:** `Edit`, `Write` 도구 호출 시
-- **입력:** stdin JSON에서 `tool_input.file_path` 추출 + `git branch --show-current`로 현재 브랜치 확인
+- **입력:** stdin JSON → `hook_get '.tool_input.file_path'` + `git rev-parse --abbrev-ref HEAD`로 현재 브랜치 확인
 - **동작:** 현재 브랜치가 보호 브랜치이고, 대상 파일이 `docs/` 밖이면 exit 2 (BLOCK)
 - **보호 브랜치:** 스크립트 상단 `PROTECTED_BRANCHES` 배열에 정의 (기본: main, develop)
+- **detached HEAD 처리:** `git rev-parse --abbrev-ref HEAD`가 `HEAD`를 반환하면 (detached 상태), 경고 출력 후 통과. 이유: worktree에서 특정 커밋 체크아웃 시 발생할 수 있는 정상 시나리오
 
 ### PostToolUse
 
@@ -201,6 +262,8 @@ hook_block "git push --force is not allowed"
 - **출력:** fix 결과를 stderr로 (Claude 피드백)
 - **실패 시:** exit 0 유지 (차단 아님, 정보만 제공)
 - **성능 고려:** 단일 파일 대상이므로 속도 영향 미미. 대규모 자동 생성 시 병목이 되면 비활성화 가능 (README 안내)
+- **보안 고려:** ESLint는 플러그인 코드를 실행함. 악성 `.eslintrc`/플러그인이 도입되면 이 hook을 통해 실행될 수 있음. README에 "hook이 실행하는 외부 도구의 보안은 프로젝트 책임"임을 명시
+- **fail-open 설정:** `HOOK_FAIL_OPEN=1`로 source하여, lint 실패/jq 미설치 시에도 파일 쓰기를 차단하지 않음
 
 ### 의도적 제외
 
@@ -223,21 +286,12 @@ hook_block "git push --force is not allowed"
 
 #### `jq` 의존성 전략
 
-모든 hook 스크립트 상단에 동일 패턴 적용:
+`_lib/common.sh`에서 `HOOK_FAIL_OPEN` 플래그로 분기:
 
-```bash
-#!/bin/bash
-# jq fallback: 미설치 시 경고 후 통과 (차단하지 않음)
-if ! command -v jq &>/dev/null; then
-  echo "WARNING: jq not installed. Hook skipped." >&2
-  exit 0
-fi
+- **PreToolUse (보안용):** fail-closed (기본). jq 미설치 시 **차단** (exit 2) + 설치 안내 출력
+- **PostToolUse (정보용):** `HOOK_FAIL_OPEN=1` 설정 시 fail-open. jq 미설치 시 경고 후 **통과** (exit 0)
 
-INPUT=$(cat)
-# ... jq로 파싱
-```
-
-이유: hook 의존성 문제로 개발 작업이 차단되는 것보다, 경고를 주고 통과시키는 것이 안전.
+이유: 보안 hook의 fail-open은 전체 보호 레이어를 무음으로 비활성화하므로 허용 불가. `deny` 리스트가 최후 방어선이지만, `deny`가 커버하지 않는 패턴(브랜치 보호, SQL 명령 등)은 hook이 유일한 방어선.
 
 #### CI Secrets 미설정 시
 
@@ -300,8 +354,9 @@ Boardinary의 185줄 검증 워크플로우를 기반으로 범용화. `anthropi
 
 - **트리거:** PR `opened` / `synchronize` / `ready_for_review` + `issue_comment` (`@claude` 리리뷰 요청)
 - **실행 조건:** draft PR 제외, issue_comment은 `@claude` 포함 시만
-- **제외 경로:** `docs/**`, `*.md`, `.github/**`, `.claude/**`, lock 파일
+- **제외 경로:** `docs/**`, `*.md`, `.github/**`, lock 파일. **`.claude/**`는 제외하지 않음\*\* — hook 파일 변경은 보안 영향이 있으므로 반드시 리뷰 대상
 - **Secrets 필요:** `CLAUDE_CODE_OAUTH_TOKEN` (claude-code-action에서 사용)
+- **액션 버전:** `anthropics/claude-code-action@<SHA>` (특정 커밋 SHA 고정). `@v1` 같은 무빙 태그는 공급망 공격 벡터이므로 사용 금지. 구현 시 최신 릴리스의 full SHA를 README에 기록
 
 #### 증분 판별 알고리즘
 
@@ -376,6 +431,7 @@ test (독립, DB service 포함)
 - **스케줄:** 주간 크론 (일요일 03:00 UTC) + `workflow_dispatch` (수동 실행)
 - **대상:** `{{BRANCH_PATTERN}}` (기본: `feature/*`) + 머지 완료 + `{{RETENTION_DAYS}}` (기본: 90일) 초과
 - **보호:** main, develop 등 보호 브랜치 제외
+- **안전장치:** dry-run 모드 기본. 실제 삭제 전 대상 목록을 워크플로우 로그에 출력. `workflow_dispatch`에 `dry_run` 입력 파라미터 (기본: `true`) — `false`로 설정 시에만 실제 삭제 수행. 크론 실행 시에도 dry-run이 기본이며, 실제 삭제를 활성화하려면 워크플로우 파일에서 `DRY_RUN` 환경변수를 `false`로 변경
 
 ---
 
@@ -389,9 +445,13 @@ test (독립, DB service 포함)
     "allow": [
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)",
+      "Bash(git push origin:*)", // origin만 허용 (임의 remote 방지)
       "Bash(git checkout:*)",
       "Bash(git worktree:*)",
+      "Bash(git branch:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
       "Bash(gh pr:*)",
       "Bash({{PACKAGE_MANAGER}}:*)",
       "Bash({{PACKAGE_MANAGER}} run:*)",
@@ -400,7 +460,10 @@ test (독립, DB service 포함)
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push --delete:*)", // 리모트 브랜치 삭제 방지
       "Bash(git reset --hard:*)",
+      "Bash(git clean -f:*)", // untracked 강제 삭제 방지
     ],
   },
   "hooks": {
@@ -454,7 +517,13 @@ test (독립, DB service 포함)
 2. 플레이스홀더 입력 (선택된 모듈에 필요한 값만)
    - 기본값 제시, Enter로 수락
    - 이전 실행 시 저장된 값이 있으면 해당 값을 기본값으로 표시
+   - **입력값 검증:** 알파벳, 숫자, 하이픈, 언더스코어, 점, 슬래시, 공백만 허용
+     (`[a-zA-Z0-9._/ -]`). 특수문자 포함 시 거부 + 재입력 요청
+   - **sed 안전 치환:** 구분자를 `|`로 사용 (`sed "s|{{PLACEHOLDER}}|$VALUE|g"`)
+     하여 입력값의 `/` 충돌 방지. 추가로 `$`, `` ` ``, `&` 문자 이스케이프 처리
    - 설정값을 .claude/.harness-config에 JSON으로 저장 (재실행 시 참조)
+   - **민감정보 경고:** 입력값에 `token`, `secret`, `key`, `password` 포함 시
+     "이 파일에 민감정보를 저장하지 마세요" 경고 출력
 
 3. 파일별 처리 (선택된 모듈만)
    - *.template → sed 치환 → 확장자 제거
@@ -513,8 +582,10 @@ hooks.PostToolUse  → 배열 머지 (동일 방식)
 
 ```json
 {
+  "_warning": "Do not store secrets (tokens, keys, passwords) in this file.",
   "initialized_at": "2026-03-30T12:00:00Z",
   "version": "1.0.0",
+  "modules": ["hooks", "claude-review", "ci", "scripts"],
   "values": {
     "PROJECT_NAME": "my-project",
     "MAIN_BRANCH": "main",
