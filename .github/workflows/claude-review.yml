@@ -47,7 +47,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: "--model claude-haiku-4-5-20251001"
-          show_full_output: false
+          show_full_output: true
           prompt: |
             이 PR을 코드 리뷰하세요.
             리뷰 모드: ${{ steps.context.outputs.is_incremental == 'true' && '증분 리뷰' || '전체 리뷰' }}
@@ -114,7 +114,6 @@ jobs:
             - 메모리 저장/설정 작업 금지
             - 전체 diff를 한번에 읽기 금지
             - `gh pr review`, `gh pr comment` 등 직접 게시 명령 실행 금지
-            - 중간 계획/질문 출력 금지 — "승인해주시겠어요?", "다음 명령을 실행하겠습니다" 등의 중간 대화 없이 바로 작업 수행
             - `src/components/ui/*` 파일 리뷰 금지 (shadcn/ui 보일러플레이트)
             - `.github/screenshots/*` 파일 읽기 금지 (바이너리)
             - diff에 포함되지 않은 파일에 대한 이슈 제기 금지 — PR 범위 밖 코드는 리뷰 대상이 아님
