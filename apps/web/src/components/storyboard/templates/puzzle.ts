@@ -6,7 +6,7 @@ export const puzzleTemplate: StoryboardTemplate = {
   genre: "Puzzle",
   description:
     "퍼즐을 풀며 진행하는 어드벤처 게임 흐름. 힌트 시스템과 재시도 분기 포함.",
-  nodeCount: 7,
+  nodeCount: 8,
   content: {
     version: 1,
     viewport: { x: 0, y: 0, zoom: 1 },
@@ -84,6 +84,18 @@ export const puzzleTemplate: StoryboardTemplate = {
         },
       },
       {
+        id: "pzl-event-2",
+        type: "event",
+        position: { x: 500, y: 50 },
+        data: {
+          title: "힌트 표시",
+          description:
+            "플레이어에게 힌트를 제공한다. 상형문자의 일부 의미가 밝혀진다.",
+          color: "#06b6d4",
+          tags: ["힌트", "도움"],
+        },
+      },
+      {
         id: "pzl-note-1",
         type: "note",
         position: { x: 1000, y: 400 },
@@ -105,8 +117,13 @@ export const puzzleTemplate: StoryboardTemplate = {
       {
         id: "pzl-e3",
         source: "pzl-condition-1",
-        target: "pzl-event-1",
+        target: "pzl-event-2",
         sourceHandle: "false",
+      },
+      {
+        id: "pzl-e7",
+        source: "pzl-event-2",
+        target: "pzl-event-1",
       },
       { id: "pzl-e4", source: "pzl-event-1", target: "pzl-condition-2" },
       {

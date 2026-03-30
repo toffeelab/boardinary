@@ -93,6 +93,12 @@ export const actionFpsTemplate: StoryboardTemplate = {
         sourceHandle: "true",
       },
       {
+        id: "fps-e6",
+        source: "fps-condition-1",
+        target: "fps-event-1",
+        sourceHandle: "false",
+      },
+      {
         id: "fps-e4",
         source: "fps-branch-1",
         target: "fps-scene-2",
