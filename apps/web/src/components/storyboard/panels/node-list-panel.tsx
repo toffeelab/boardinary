@@ -16,6 +16,9 @@ const NODE_TYPE_CONFIG = {
   scene: { label: "씬", color: "#8b5cf6" },
   event: { label: "이벤트", color: "#10b981" },
   branch: { label: "분기", color: "#f59e0b" },
+  dialogue: { label: "대사", color: "#3b82f6" },
+  condition: { label: "조건", color: "#ef4444" },
+  note: { label: "메모", color: "#6b7280" },
 } as const;
 
 type NodeType = keyof typeof NODE_TYPE_CONFIG;
@@ -28,6 +31,9 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
       scene: [],
       event: [],
       branch: [],
+      dialogue: [],
+      condition: [],
+      note: [],
     };
     for (const node of nodes) {
       const type = node.type as NodeType;

@@ -118,7 +118,13 @@ export function PropertyPanel({
     );
   }
 
-  const nodeType = selectedNode.type as "scene" | "event" | "branch";
+  const nodeType = selectedNode.type as
+    | "scene"
+    | "event"
+    | "branch"
+    | "dialogue"
+    | "condition"
+    | "note";
 
   return (
     <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
@@ -142,53 +148,104 @@ export function PropertyPanel({
           />
         </div>
 
-        {/* 설명 */}
-        <div className="space-y-1.5">
-          <Label htmlFor="node-description" className="text-xs">
-            설명
-          </Label>
-          <Textarea
-            id="node-description"
-            value={nodeData.description ?? ""}
-            onChange={(e) => handleChange("description", e.target.value)}
-            placeholder="노드 설명"
-            rows={3}
-          />
-        </div>
-
-        {/* 태그 */}
-        <div className="space-y-1.5">
-          <Label htmlFor="node-tags" className="text-xs">
-            태그 (쉼표 구분)
-          </Label>
-          <Input
-            id="node-tags"
-            value={(nodeData.tags ?? []).join(", ")}
-            onChange={(e) => handleTagsChange(e.target.value)}
-            placeholder="태그1, 태그2"
-          />
-        </div>
-
-        {/* 색상 */}
-        <div className="space-y-1.5">
-          <Label className="text-xs">색상</Label>
-          <div className="flex flex-wrap gap-2">
-            {COLOR_PALETTE.map((color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => handleChange("color", color)}
-                className={`h-6 w-6 rounded-full border-2 transition-transform ${
-                  nodeData.color === color
-                    ? "scale-110 border-foreground"
-                    : "border-transparent hover:scale-105"
-                }`}
-                style={{ backgroundColor: color }}
-                aria-label={`색상 ${color}`}
+        {/* 대사 전용: 화자 + 대사 텍스트 */}
+        {nodeType === "dialogue" && (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="node-speaker" className="text-xs">
+                화자
+              </Label>
+              <Input
+                id="node-speaker"
+                value={nodeData.speaker ?? ""}
+                onChange={(e) => handleChange("speaker", e.target.value)}
+                placeholder="화자 이름"
               />
-            ))}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="node-dialogue-text" className="text-xs">
+                대사 텍스트
+              </Label>
+              <Textarea
+                id="node-dialogue-text"
+                value={nodeData.dialogueText ?? ""}
+                onChange={(e) => handleChange("dialogueText", e.target.value)}
+                placeholder="대사 내용을 입력하세요"
+                rows={4}
+              />
+            </div>
+          </>
+        )}
+
+        {/* 조건 전용: 조건식 */}
+        {nodeType === "condition" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="node-condition-expr" className="text-xs">
+              조건식
+            </Label>
+            <Input
+              id="node-condition-expr"
+              value={nodeData.conditionExpr ?? ""}
+              onChange={(e) => handleChange("conditionExpr", e.target.value)}
+              placeholder="예: player.level >= 10"
+              className="font-mono text-sm"
+            />
           </div>
-        </div>
+        )}
+
+        {/* 설명 (대사 노드 제외 — 대사는 dialogueText 사용) */}
+        {nodeType !== "dialogue" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="node-description" className="text-xs">
+              설명
+            </Label>
+            <Textarea
+              id="node-description"
+              value={nodeData.description ?? ""}
+              onChange={(e) => handleChange("description", e.target.value)}
+              placeholder="노드 설명"
+              rows={nodeType === "note" ? 5 : 3}
+            />
+          </div>
+        )}
+
+        {/* 태그 (메모 제외) */}
+        {nodeType !== "note" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="node-tags" className="text-xs">
+              태그 (쉼표 구분)
+            </Label>
+            <Input
+              id="node-tags"
+              value={(nodeData.tags ?? []).join(", ")}
+              onChange={(e) => handleTagsChange(e.target.value)}
+              placeholder="태그1, 태그2"
+            />
+          </div>
+        )}
+
+        {/* 색상 (메모 제외) */}
+        {nodeType !== "note" && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">색상</Label>
+            <div className="flex flex-wrap gap-2">
+              {COLOR_PALETTE.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => handleChange("color", color)}
+                  className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                    nodeData.color === color
+                      ? "scale-110 border-foreground"
+                      : "border-transparent hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: color }}
+                  aria-label={`색상 ${color}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 분기 전용: 선택지 */}
         {nodeType === "branch" && (

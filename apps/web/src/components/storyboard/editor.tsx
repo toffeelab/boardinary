@@ -47,24 +47,48 @@ interface StoryboardEditorProps {
   storyboardName: string;
 }
 
+type AddableNodeType =
+  | "scene"
+  | "event"
+  | "branch"
+  | "dialogue"
+  | "condition"
+  | "note";
+
 /** Default data factories per node type */
-function createDefaultNodeData(
-  type: "scene" | "event" | "branch",
-): StoryboardNodeData {
+function createDefaultNodeData(type: AddableNodeType): StoryboardNodeData {
   const base: StoryboardNodeData = { title: "" };
-  if (type === "scene") {
-    base.title = "새 씬";
-    base.color = "#8b5cf6";
-  } else if (type === "event") {
-    base.title = "새 이벤트";
-    base.color = "#10b981";
-  } else {
-    base.title = "새 분기";
-    base.color = "#f59e0b";
-    base.choices = [
-      { id: crypto.randomUUID(), label: "선택지 1" },
-      { id: crypto.randomUUID(), label: "선택지 2" },
-    ];
+  switch (type) {
+    case "scene":
+      base.title = "새 씬";
+      base.color = "#8b5cf6";
+      break;
+    case "event":
+      base.title = "새 이벤트";
+      base.color = "#10b981";
+      break;
+    case "branch":
+      base.title = "새 분기";
+      base.color = "#f59e0b";
+      base.choices = [
+        { id: crypto.randomUUID(), label: "선택지 1" },
+        { id: crypto.randomUUID(), label: "선택지 2" },
+      ];
+      break;
+    case "dialogue":
+      base.title = "새 대사";
+      base.color = "#3b82f6";
+      base.speaker = "";
+      base.dialogueText = "";
+      break;
+    case "condition":
+      base.title = "새 조건";
+      base.color = "#ef4444";
+      base.conditionExpr = "";
+      break;
+    case "note":
+      base.title = "새 메모";
+      break;
   }
   return base;
 }
@@ -260,7 +284,7 @@ function EditorInner({
 
   // Add node from toolbar
   const handleAddNode = useCallback(
-    (type: "scene" | "event" | "branch") => {
+    (type: AddableNodeType) => {
       pushSnapshot(nodesRef.current, edgesRef.current);
 
       const viewport = reactFlowInstance.getViewport();
@@ -290,7 +314,7 @@ function EditorInner({
   // Add node via drag-and-drop on canvas
   const handleNodeDrop = useCallback(
     (
-      type: "scene" | "event" | "branch",
+      type: AddableNodeType,
       position: { x: number; y: number },
     ) => {
       pushSnapshot(nodesRef.current, edgesRef.current);
