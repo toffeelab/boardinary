@@ -69,7 +69,12 @@ export class StoryboardsService {
   async createStoryboard(
     projectId: string,
     userId: string,
-    data: { name: string; description?: string; genre?: string },
+    data: {
+      name: string;
+      description?: string;
+      genre?: string;
+      content?: Record<string, unknown>;
+    },
   ) {
     const [storyboard] = await db
       .insert(storyboards)
@@ -80,7 +85,7 @@ export class StoryboardsService {
         name: data.name,
         description: data.description ?? null,
         genre: data.genre ?? null,
-        content: {},
+        content: data.content ?? {},
         contentVersion: 0,
       })
       .returning();

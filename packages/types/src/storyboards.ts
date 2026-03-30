@@ -21,6 +21,7 @@ export interface CreateStoryboardDto {
   name: string;
   description?: string;
   genre?: string;
+  content?: Record<string, unknown>;
 }
 
 export interface StoryboardNodeData {
