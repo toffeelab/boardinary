@@ -1,0 +1,65 @@
+# shadcn/ui — LLM 참조 문서
+# 소스: context7 MCP (/websites/ui_shadcn)
+# 생성일: 2026-03-30
+
+## 개요
+shadcn/ui는 복사-붙여넣기 방식의 UI 컴포넌트 컬렉션이다.
+npm 패키지가 아닌, 프로젝트에 소스 코드를 직접 추가한다.
+Radix UI + Tailwind CSS 기반.
+
+## 설치 (CLI)
+
+```bash
+# 컴포넌트 추가
+npx shadcn@latest add button
+npx shadcn@latest add button card input label   # 여러 개
+npx shadcn@latest add --all                     # 전체
+
+# pnpm 사용 시
+pnpm dlx shadcn@latest add <component>
+```
+
+## 주요 컴포넌트
+
+### 기본
+- Button — 버튼 (variant: default, destructive, outline, secondary, ghost, link)
+- Input — 텍스트 입력
+- Label — 레이블
+- Textarea — 멀티라인 입력
+
+### 레이아웃/오버레이
+- Dialog — 모달 다이얼로그
+- Sheet — 사이드 패널
+- Drawer — 하단 드로어 (모바일)
+- Alert Dialog — 확인/취소 다이얼로그
+- Popover — 팝오버
+
+### 데이터 표시
+- Table — 테이블
+- Card — 카드 컨테이너
+- Badge — 뱃지/태그
+- Avatar — 아바타
+
+### 내비게이션
+- Tabs — 탭
+- Dropdown Menu — 드롭다운 메뉴
+- Command — 커맨드 팔레트 (검색)
+- Sidebar — 사이드바 레이아웃
+
+### 폼
+- Form — React Hook Form + Zod 연동
+- Select — 셀렉트
+- Checkbox — 체크박스
+- Switch — 토글 스위치
+- Slider — 슬라이더
+
+## cn() 유틸리티
+
+```typescript
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+```

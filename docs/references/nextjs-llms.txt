@@ -1,0 +1,53 @@
+# Next.js 16 — LLM 참조 문서
+# 소스: context7 MCP (/vercel/next.js v16.0.3)
+# 생성일: 2026-03-30
+
+## App Router 핵심 패턴
+
+### Server Component (기본)
+- 모든 컴포넌트는 기본적으로 Server Component
+- async 함수로 선언하여 직접 데이터 fetch 가능
+- 'use client' 명시 없으면 서버에서만 렌더링
+
+### 데이터 Fetching — 캐싱 전략
+
+```typescript
+// 1. 정적 데이터 (getStaticProps 대체)
+const data = await fetch('https://...', { cache: 'force-cache' })
+
+// 2. 동적 데이터 (getServerSideProps 대체)
+const data = await fetch('https://...', { cache: 'no-store' })
+
+// 3. ISR (revalidate)
+const data = await fetch('https://...', { next: { revalidate: 10 } })
+```
+
+### Server Actions
+
+```typescript
+// app/actions.ts
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+export async function createPost(formData: FormData) {
+  // DB 업데이트
+  await db.insert(...)
+
+  // 캐시 무효화
+  revalidatePath('/posts')
+}
+```
+
+### 라우팅 구조
+- app/ 디렉토리 기반 파일 시스템 라우팅
+- page.tsx — 페이지 컴포넌트
+- layout.tsx — 레이아웃 (중첩 가능)
+- loading.tsx — 로딩 UI (Suspense)
+- error.tsx — 에러 바운더리
+- route.ts — API 라우트 핸들러
+
+### Middleware
+- middleware.ts (프로젝트 루트)
+- Edge Runtime에서 실행
+- 인증 체크, 리다이렉트 등
