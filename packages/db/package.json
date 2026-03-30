@@ -29,11 +29,12 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@paralleldrive/cuid2": "^3.3.0",
     "drizzle-orm": "^0.45.1",
-    "postgres": "^3.4.8",
-    "@paralleldrive/cuid2": "^3.3.0"
+    "postgres": "^3.4.8"
   },
   "devDependencies": {
+    "@repo/eslint-config": "workspace:^",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.15.2",
     "drizzle-kit": "^0.31.1",
