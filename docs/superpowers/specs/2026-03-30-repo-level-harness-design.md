@@ -502,19 +502,29 @@ test (독립, DB service 포함)
 
 재실행 가능한 초기화 스크립트. 이미 적용된 항목은 스킵하고, 변경이 필요한 항목만 처리.
 
-#### 실행 흐름
+#### 실행 모드
+
+- **대화형 (기본):** `sh scripts/init-harness.sh` — 모듈 선택 + 플레이스홀더 입력
+- **기본값 모드:** `sh scripts/init-harness.sh --defaults` — 모든 모듈 설치 + 기본값 사용. 질문 없음
+- **업데이트 확인:** `sh scripts/init-harness.sh --check-update` — 버전 비교 + 변경사항 표시
+
+#### 실행 흐름 (대화형)
 
 ```
-1. 모듈 선택 (대화형)
-   [1/4] Claude Code Hooks (settings.json + hook 스크립트)?  [Y/n]
-   [2/4] CI/CD Workflows?  [Y/n]
-     ├── claude-review.yml?  [Y/n]
-     ├── ci.yml?  [Y/n]
-     └── cleanup-branches.yml?  [Y/n]
-   [3/4] Scripts (health-check, doc-check)?  [Y/n]
-   [4/4] Memory 초기 구조?  [Y/n]
+1. 사전 검사
+   - jq 설치 여부 확인 (미설치 시 설치 안내 후 중단)
+   - git 리포지토리 여부 확인
 
-2. 플레이스홀더 입력 (선택된 모듈에 필요한 값만)
+2. 모듈 선택 (각 모듈에 한 줄 설명 포함)
+   [1/4] Claude Code Hooks — AI가 위험한 명령을 실행하기 전에 자동 차단  [Y/n]
+   [2/4] CI/CD Workflows — PR 자동 코드리뷰 + 빌드/테스트 파이프라인  [Y/n]
+     ├── claude-review.yml — AI가 PR을 자동 리뷰  [Y/n]
+     ├── ci.yml — lint/타입체크/빌드/테스트 자동화  [Y/n]
+     └── cleanup-branches.yml — 머지된 브랜치 주간 자동 정리  [Y/n]
+   [3/4] Scripts — 개발 환경 상태 확인 + 문서 무결성 검사  [Y/n]
+   [4/4] Memory — Claude의 대화 간 기억 저장 구조  [Y/n]
+
+3. 플레이스홀더 입력 (선택된 모듈에 필요한 값만)
    - 기본값 제시, Enter로 수락
    - 이전 실행 시 저장된 값이 있으면 해당 값을 기본값으로 표시
    - **입력값 검증:** 알파벳, 숫자, 하이픈, 언더스코어, 점, 슬래시, 공백만 허용
@@ -524,6 +534,7 @@ test (독립, DB service 포함)
    - 설정값을 .claude/.harness-config에 JSON으로 저장 (재실행 시 참조)
    - **민감정보 경고:** 입력값에 `token`, `secret`, `key`, `password` 포함 시
      "이 파일에 민감정보를 저장하지 마세요" 경고 출력
+   - **힌트:** 각 플레이스홀더 프롬프트에 "(잘 모르겠으면 Enter — 기본값 사용)" 표시
 
 3. 파일별 처리 (선택된 모듈만)
    - *.template → sed 치환 → 확장자 제거
@@ -534,6 +545,36 @@ test (독립, DB service 포함)
    - chmod +x hook 스크립트 + _lib/common.sh
    - memory/ → ~/.claude/projects/ 복사 (기존 MEMORY.md 있으면 스킵)
    - .gitignore에 .claude/settings.local.json, .claude/.harness-config 추가 (없으면)
+
+5. 완료 메시지 (설치된 내용 + 테스트 방법 + 다음 단계)
+```
+
+#### 완료 메시지
+
+init-harness.sh 완료 시 아래 형식으로 출력:
+
+```
+✓ 설치 완료!
+
+설치된 구성요소:
+  ✓ Claude Code Hooks (3개)
+    - 위험 명령 차단 (git push --force, rm -rf 등)
+    - 보호 브랜치 편집 차단 (main, develop)
+    - 파일 저장 후 자동 lint
+  ✓ CI/CD Workflows (3개)
+    - claude-review.yml (PR 자동 코드리뷰)
+    - ci.yml (빌드/테스트 파이프라인)
+    - cleanup-branches.yml (브랜치 자동 정리)
+  ✓ Scripts (2개)
+
+테스트해보기:
+  Claude Code에서 "git push --force origin main"을 시도하면
+  "BLOCKED: force push is not allowed" 메시지가 표시되어야 합니다.
+
+다음 단계:
+  1. CLAUDE.md를 프로젝트에 맞게 작성하세요 (템플릿: CLAUDE.md.template)
+  2. GitHub Settings → Secrets에 CLAUDE_CODE_OAUTH_TOKEN을 추가하세요
+  3. 설정을 git에 커밋하세요: git add .claude/ .github/ scripts/ && git commit
 ```
 
 **모듈-플레이스홀더 매핑:**
@@ -691,15 +732,142 @@ type: { { user|feedback|project|reference } }
 
 ## README.md
 
-1. **개요** — 이 템플릿이 뭔지, 왜 필요한지
-2. **빠른 시작**
-   - `scripts/init-harness.sh` 실행 방법
-   - 필요한 GitHub Secrets (`ANTHROPIC_API_KEY`)
-3. **플레이스홀더 목록** — 전체 목록 + 설명 + 기본값
-4. **파일별 복사 위치** — 매핑 표
-5. **구성요소별 사용법** — Hooks / CI / Scripts / Memory / CLAUDE.md
-6. **커스터마이징 가이드** — Application Level로 확장하는 법
-7. **졸업 기준** — 별도 리포로 분리하는 시점 + 방법
+### 1. 이게 뭔가요? (Before / After)
+
+템플릿이 무엇이고 왜 필요한지, 설치 전후 차이를 구체적으로 보여준다:
+
+```
+설치 전                              설치 후
+─────────────────────────────────   ─────────────────────────────────
+Claude가 git push --force를          → 자동 차단 + "BLOCKED" 메시지
+  아무 경고 없이 실행
+
+main 브랜치에서 실수로 코드 수정     → "보호 브랜치입니다" 차단
+
+PR 올리면 사람이 리뷰해야 함         → Claude가 자동 코드 리뷰
+                                       (🔴 Critical / 🟡 Important / 🔵 Suggestion)
+
+매 프로젝트마다 CLAUDE.md를           → 검증된 골격 템플릿 제공
+  처음부터 작성
+
+머지된 브랜치가 쌓여감                → 주간 자동 정리
+```
+
+### 2. 빠른 시작 (5분)
+
+```bash
+# 1. 템플릿 복사
+cp -r templates/harness/ /path/to/your/project/
+
+# 2. 초기화 (모든 질문에 기본값 사용)
+cd /path/to/your/project
+sh scripts/init-harness.sh --defaults
+
+# 3. 끝! 테스트해보기
+# Claude Code에서 "git push --force origin main"을 입력해보세요.
+# "BLOCKED: ..." 메시지가 표시되면 성공!
+```
+
+> 기본값이 아닌 커스텀 설정이 필요하면: `sh scripts/init-harness.sh` (대화형 모드)
+
+### 3. 필요한 사전 준비
+
+| 도구           | 용도               | 설치 방법                                            |
+| -------------- | ------------------ | ---------------------------------------------------- |
+| `jq`           | hook에서 JSON 파싱 | `brew install jq` (macOS) / `apt install jq` (Linux) |
+| GitHub Secrets | CI 코드리뷰        | Settings → Secrets → `CLAUDE_CODE_OAUTH_TOKEN` 추가  |
+
+> `jq`가 없으면 보안 hook이 동작하지 않고 차단됩니다. 반드시 먼저 설치하세요.
+
+### 4. 구성요소별 설명
+
+각 구성요소가 **뭘 하는지**, **왜 필요한지**, **어떻게 동작하는지**를 초보자 눈높이로 설명:
+
+| 구성요소      | 한 줄 설명                                                                         |
+| ------------- | ---------------------------------------------------------------------------------- |
+| **Hooks**     | Claude가 파일을 수정하거나 명령을 실행하기 전/후에 자동으로 실행되는 검사 스크립트 |
+| **CI/CD**     | PR을 올리면 GitHub에서 자동으로 실행되는 코드 리뷰 + 빌드/테스트                   |
+| **Scripts**   | 개발 환경 상태를 확인하거나 문서 무결성을 검사하는 유틸리티                        |
+| **Memory**    | Claude가 대화 간에 기억하는 정보를 저장하는 구조                                   |
+| **CLAUDE.md** | Claude에게 프로젝트 규칙을 알려주는 가이드 문서                                    |
+
+### 5. 커스터마이징 예시
+
+#### 차단 패턴 추가하기
+
+```bash
+# .claude/hooks/PreToolUse/block-dangerous-commands.sh 상단의 배열에 추가:
+BLOCKED_PATTERNS=(
+  # ... 기본 패턴들 (건드리지 않음) ...
+  'npm publish'           # 실수로 npm 배포 방지
+  'docker rm.*--force'    # 컨테이너 강제 삭제 방지
+  'kubectl delete'        # K8s 리소스 삭제 방지
+)
+```
+
+#### 새 hook 추가하기
+
+```bash
+# 1. 스크립트 생성
+cat > .claude/hooks/PreToolUse/my-custom-hook.sh << 'EOF'
+#!/bin/bash
+source "$(dirname "$0")/../_lib/common.sh"
+
+COMMAND=$(hook_get '.tool_input.command')
+NORMALIZED=$(hook_normalize_command "$COMMAND")
+
+if [[ "$NORMALIZED" =~ my_dangerous_pattern ]]; then
+  hook_block "This command is not allowed in this project"
+fi
+EOF
+chmod +x .claude/hooks/PreToolUse/my-custom-hook.sh
+
+# 2. settings.json의 hooks.PreToolUse 배열에 추가:
+# { "matcher": "Bash", "hooks": ["sh .claude/hooks/PreToolUse/my-custom-hook.sh"] }
+```
+
+### 6. 트러블슈팅 FAQ
+
+```
+Q: hook이 동작하지 않아요
+A: 1) jq 설치 확인: which jq
+   2) 실행 권한 확인: chmod +x .claude/hooks/**/*.sh
+   3) settings.json 문법 확인: cat .claude/settings.json | jq .
+   4) Claude Code 재시작
+
+Q: "BLOCKED: jq is required" 메시지가 나와요
+A: jq를 설치하세요: brew install jq (macOS) / sudo apt install jq (Linux)
+
+Q: CI에서 Claude 리뷰가 실행되지 않아요
+A: GitHub → Settings → Secrets → CLAUDE_CODE_OAUTH_TOKEN이 설정되어 있는지 확인.
+   미설정 시 워크플로우가 자동 스킵됩니다.
+
+Q: init-harness.sh를 다시 실행해도 되나요?
+A: 네. 멱등성(같은 결과를 보장)으로 설계되어 있어, 이미 설치된 항목은 스킵됩니다.
+   변경된 파일은 diff를 보여주고 선택할 수 있습니다.
+
+Q: 기본 패턴을 수정했는데 init-harness.sh 재실행하면 덮어써지나요?
+A: 아닙니다. 파일이 다르면 diff를 보여주고 Overwrite/Skip/Backup 중 선택합니다.
+   settings.json은 기존 항목을 유지하면서 새 항목만 추가합니다.
+```
+
+### 7. 용어집
+
+| 용어             | 뜻                                                                  |
+| ---------------- | ------------------------------------------------------------------- |
+| **Hook**         | 특정 이벤트(파일 수정, 명령 실행 등) 발생 시 자동 실행되는 스크립트 |
+| **PreToolUse**   | Claude가 도구를 사용하기 "전"에 실행. 차단 가능                     |
+| **PostToolUse**  | Claude가 도구를 사용한 "후"에 실행. 정보 제공용                     |
+| **fail-closed**  | 문제 시 차단 (안전 우선). 보안 hook의 기본 동작                     |
+| **fail-open**    | 문제 시 통과 (편의 우선). lint 같은 비보안 hook에 사용              |
+| **멱등성**       | 여러 번 실행해도 같은 결과. init-harness.sh의 설계 원칙             |
+| **플레이스홀더** | `{{PROJECT_NAME}}` 같은 자리표시자. 초기화 시 실제 값으로 대체됨    |
+
+### 8. 파일별 복사 위치 — 매핑 표
+
+### 9. 플레이스홀더 목록 — 전체 목록 + 설명 + 기본값
+
+### 10. 졸업 기준 — 별도 리포로 분리하는 시점 + 방법
 
 ---
 
