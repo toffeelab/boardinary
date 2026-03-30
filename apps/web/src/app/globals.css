@@ -83,3 +83,33 @@
     cursor: pointer;
   }
 }
+
+/* @xyflow/react controls — dark mode visibility */
+.react-flow__controls {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.react-flow__controls-button {
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  fill: var(--color-foreground);
+  color: var(--color-foreground);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--color-accent);
+}
+
+.react-flow__controls-button svg {
+  fill: var(--color-foreground);
+}
+
+/* @xyflow/react minimap */
+.react-flow__minimap {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
