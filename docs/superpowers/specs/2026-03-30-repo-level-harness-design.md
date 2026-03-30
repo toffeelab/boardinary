@@ -157,6 +157,53 @@ DEVELOP_BRANCH="develop"
 | 세션 시작 시 health-check 자동 | CLAUDE.md 지시사항으로 충분          |
 | 파일 읽기 시 보안 체크         | 과도한 간섭, false positive 위험     |
 
+### Failure Modes
+
+#### Hook 스크립트 크래시 시
+
+| 상황                            | Claude Code 동작                                               | 대응                                                                                 |
+| ------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --- | ------------------------------------------------------------------------------- |
+| `jq` 미설치로 hook 실패         | hook이 non-zero exit → **도구 호출 차단** (exit 2와 동일 취급) | hook 첫 줄에 `jq` 존재 확인: `command -v jq >/dev/null 2>&1                          |     | { echo "jq required" >&2; exit 0; }` — 미설치 시 통과(exit 0)시키고 경고만 출력 |
+| hook 스크립트 permission denied | 실행 불가 → 차단                                               | `init-harness.sh`에서 `chmod +x` 자동 적용. README에 수동 방법 안내                  |
+| hook 내 무한루프/타임아웃       | Claude Code가 hook 타임아웃 적용 (기본 10초)                   | 복잡한 로직 지양. 단순 패턴 매칭만 수행                                              |
+| stdin JSON 파싱 실패            | 변수 비어있음 → 의도치 않은 차단/통과                          | 파싱 실패 시 기본 동작을 명시적으로 정의: PreToolUse는 **통과**(exit 0), 안전한 방향 |
+
+#### `jq` 의존성 전략
+
+모든 hook 스크립트 상단에 동일 패턴 적용:
+
+```bash
+#!/bin/bash
+# jq fallback: 미설치 시 경고 후 통과 (차단하지 않음)
+if ! command -v jq &>/dev/null; then
+  echo "WARNING: jq not installed. Hook skipped." >&2
+  exit 0
+fi
+
+INPUT=$(cat)
+# ... jq로 파싱
+```
+
+이유: hook 의존성 문제로 개발 작업이 차단되는 것보다, 경고를 주고 통과시키는 것이 안전.
+
+#### CI Secrets 미설정 시
+
+| Secrets                   | 미설정 시 동작                                                  | 대응                                                                                                                                   |
+| ------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLAUDE_CODE_OAUTH_TOKEN` | claude-code-action step 실패 → 워크플로우 실패 → PR에 빨간 체크 | README "초기 설정"에 필수 Secrets 명시. 워크플로우에 `if: secrets.CLAUDE_CODE_OAUTH_TOKEN != ''` 조건 추가하여 미설정 시 graceful skip |
+
+#### Hook 간 중복 차단
+
+`deny` 리스트와 `block-dangerous-commands.sh`가 같은 명령을 잡는 경우:
+
+- `deny`가 먼저 평가됨 (Claude Code 내부 로직) → hook까지 도달하지 않음
+- 사용자에게 한 번만 차단 메시지 표시
+- 이는 의도된 동작: `deny`는 최후 방어선, hook은 커스터마이징 가능한 상세 메시지 제공
+
+#### 기존 프로젝트 적용 시
+
+`init-harness.sh`가 처리하는 충돌 시나리오 — 아래 "init-harness.sh 멱등성 설계" 참조.
+
 ---
 
 ## CLAUDE.md 템플릿
@@ -194,15 +241,66 @@ DEVELOP_BRANCH="develop"
 
 ### `claude-review.yml` — PR 코드리뷰 (Claude)
 
-- **트리거:** PR opened / synchronize / ready_for_review + `issue_comment` (`@claude` 리리뷰 요청)
+Boardinary의 185줄 검증 워크플로우를 기반으로 범용화. `anthropics/claude-code-action@v1` 사용.
+
+#### 트리거 및 조건
+
+- **트리거:** PR `opened` / `synchronize` / `ready_for_review` + `issue_comment` (`@claude` 리리뷰 요청)
+- **실행 조건:** draft PR 제외, issue_comment은 `@claude` 포함 시만
 - **제외 경로:** `docs/**`, `*.md`, `.github/**`, `.claude/**`, lock 파일
-- **리뷰 모드:** 증분 (이전 리뷰 커밋 이후 변경분) vs 풀 (첫 리뷰) 자동 판별
-- **리뷰 기준:** 🔴 Critical (머지 차단), 🟡 Important (수정 권장), 🔵 Suggestion (선택)
-- **판정:** 🔵만 → APPROVED, 🔴 있으면 → CHANGES_REQUESTED
-- **플레이스홀더:** `{{REVIEW_MODEL}}` (기본: claude-haiku-4-5-20251001), `{{REVIEW_LANGUAGE}}` (기본: English)
-- **커스터마이징:** 파일 상단 `EXCLUDE_PATTERNS` 변수로 프로젝트별 필터 추가
-- **Secrets 필요:** `ANTHROPIC_API_KEY`
-- **참고:** 이 워크플로우는 Boardinary의 185줄 검증 코드를 기반으로 범용화. 복잡도가 높으므로 README에 커스터마이징 가이드 포함
+- **Secrets 필요:** `CLAUDE_CODE_OAUTH_TOKEN` (claude-code-action에서 사용)
+
+#### 증분 판별 알고리즘
+
+```
+IF github.event.action == "synchronize":
+  → 증분 모드 (before_sha = github.event.before)
+  → git diff {before_sha}..HEAD 범위만 리뷰
+ELSE:
+  → 전체 모드
+  → git diff origin/{{DEVELOP_BRANCH}} 전체 리뷰
+```
+
+증분 모드에서 `git diff` 실패 시 전체 모드로 fallback.
+
+#### 워크플로우 구조 (4단계)
+
+```
+Step 1: Checkout (fetch-depth: 0)
+Step 2: Determine review context (증분/전체 판별, before_sha 추출)
+Step 3: Claude Code Action (리뷰 프롬프트 실행)
+Step 4: Submit review decision (결과 파싱 → gh pr review)
+```
+
+#### 리뷰 프롬프트 구조 (범용화)
+
+```
+1. 리뷰 모드 지시 (전체/증분)
+2. 전체 리뷰 절차:
+   - PR 제목/본문 읽기 → 변경 파일 목록 → 제외 패턴 적용 → 파일별 개별 diff 읽기
+3. 증분 리뷰 절차:
+   - 이전 리뷰 조회 → 새 변경분만 diff → 이전 이슈 해결 여부 검증
+4. 리뷰 본문 형식 (요약 → 잘된 점 → 이슈 등급별 → 판정)
+5. 리뷰 기준 (🔴/🟡/🔵 정의)
+6. 금지 사항 (전체 diff 한번에 읽기 금지, 직접 게시 금지 등)
+```
+
+**커스터마이징 포인트:**
+
+- 파일 상단 `EXCLUDE_PATTERNS` 변수: 프로젝트별 제외 경로 추가 (예: 자동생성 코드)
+- `{{REVIEW_MODEL}}` (기본: `claude-haiku-4-5-20251001`)
+- `{{REVIEW_LANGUAGE}}` (기본: English)
+- `{{DEVELOP_BRANCH}}` (기본: `develop`) — diff 기준 브랜치
+
+#### 결과 파싱 및 게시 (Step 4)
+
+Claude Code Action의 `execution_file` output에서 Python 스크립트로 결과 추출:
+
+```
+result에 "CHANGES_REQUESTED" 포함 → gh pr review --request-changes
+result에 "APPROVED" 포함         → gh pr review --approve
+그 외                            → gh pr comment (판정 불명확)
+```
 
 ### `ci.yml` — 통합 품질 게이트 (새 설계)
 
@@ -284,13 +382,61 @@ test (독립, DB service 포함)
 
 ## 스크립트
 
-### `scripts/init-harness.sh` (신규)
+### `scripts/init-harness.sh` (신규) — 멱등성 설계
 
-- 대화형으로 플레이스홀더 값을 입력받아 `*.template` 파일에 `sed` 치환
-- `.template` 확장자 제거
-- hook 스크립트의 상단 상수값 치환
-- `memory/` 디렉토리를 `~/.claude/projects/` 올바른 경로에 복사
-- 실행 후 자가 삭제 (init은 1회성)
+재실행 가능한 초기화 스크립트. 이미 적용된 항목은 스킵하고, 변경이 필요한 항목만 처리.
+
+#### 실행 흐름
+
+```
+1. 상태 감지
+   - .claude/settings.json 존재 여부
+   - CLAUDE.md 존재 여부
+   - hook 스크립트 존재 여부
+   - memory 디렉토리 존재 여부
+
+2. 플레이스홀더 입력 (대화형)
+   - 기본값 제시, Enter로 수락
+   - 이전 실행 시 저장된 값이 있으면 해당 값을 기본값으로 표시
+   - 설정값을 .claude/.harness-config에 JSON으로 저장 (재실행 시 참조)
+
+3. 파일별 처리
+   - *.template → sed 치환 → 확장자 제거
+   - hook 스크립트 상단 상수 치환
+   - 이미 존재하는 파일: diff 표시 → 덮어쓰기/스킵/백업 선택
+
+4. 후처리
+   - chmod +x hook 스크립트
+   - memory/ → ~/.claude/projects/ 복사 (기존 MEMORY.md 있으면 머지 아닌 스킵)
+   - .gitignore에 .claude/settings.local.json 추가 (없으면)
+```
+
+#### 충돌 처리
+
+| 상황                              | 동작                                                         |
+| --------------------------------- | ------------------------------------------------------------ |
+| `.claude/settings.json` 이미 존재 | diff 표시 → `[O]verwrite / [S]kip / [B]ackup+overwrite` 선택 |
+| `CLAUDE.md` 이미 존재             | 항상 스킵 (사용자 콘텐츠 보호). 메시지로 안내                |
+| hook 스크립트 이미 존재           | 내용 동일하면 스킵, 다르면 diff 표시 → 선택                  |
+| memory 이미 설치됨                | 스킵. `_examples/`만 없으면 복사                             |
+
+#### 저장되는 설정 파일
+
+`.claude/.harness-config` (gitignore 대상):
+
+```json
+{
+  "initialized_at": "2026-03-30T12:00:00Z",
+  "version": "1.0.0",
+  "values": {
+    "PROJECT_NAME": "my-project",
+    "MAIN_BRANCH": "main",
+    "PACKAGE_MANAGER": "pnpm"
+  }
+}
+```
+
+자가 삭제하지 않음. 재실행 시 이전 설정을 기본값으로 사용.
 
 ### `scripts/health-check.sh`
 
