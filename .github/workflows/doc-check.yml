@@ -1,0 +1,57 @@
+name: Documentation Check
+
+on:
+  pull_request:
+    branches: [develop]
+    paths: ['docs/**', 'CLAUDE.md', 'ARCHITECTURE.md', 'progress/**']
+
+jobs:
+  doc-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check CLAUDE.md references
+        run: |
+          ERRORS=0
+          while IFS= read -r ref; do
+            if [ ! -f "$ref" ] && [ ! -d "$ref" ]; then
+              echo "ERROR: CLAUDE.md references non-existent: $ref"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < <(grep -oP '(?<=\]\()(?:docs/[^\)]+|ARCHITECTURE\.md|progress/[^\)]+)' CLAUDE.md 2>/dev/null || true)
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::error::$ERRORS broken references in CLAUDE.md"
+            exit 1
+          fi
+          echo "All CLAUDE.md references valid"
+
+      - name: Validate features.json
+        run: |
+          if [ -f progress/features.json ]; then
+            python3 -c "
+          import json, sys
+          with open('progress/features.json') as f:
+              data = json.load(f)
+          for phase in data['phases']:
+              assert 'id' in phase and 'name' in phase, f'Invalid phase: {phase}'
+              for feat in phase['features']:
+                  assert 'id' in feat and 'name' in feat and 'passes' in feat, \
+                      f'Invalid feature in {phase[\"id\"]}: {feat}'
+          total = sum(len(p['features']) for p in data['phases'])
+          passed = sum(1 for p in data['phases'] for f in p['features'] if f['passes'])
+          print(f'features.json valid: {passed}/{total} passing')
+          "
+          else
+            echo "::warning::features.json not found"
+          fi
+
+      - name: Check sprint contract
+        run: |
+          if [ ! -f progress/current-sprint.md ]; then
+            echo "::warning::No active sprint contract (progress/current-sprint.md)"
+          else
+            echo "Active sprint: $(head -1 progress/current-sprint.md)"
+          fi
