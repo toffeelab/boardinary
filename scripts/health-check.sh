@@ -9,30 +9,30 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-section() { echo -e "\n${GREEN}=== $1 ===${NC}"; }
+section() { printf "\n${GREEN}=== %s ===${NC}\n" "$1"; }
 
 section "Git Status"
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "not a git repo")
 echo "Branch: $BRANCH"
 DIRTY=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 if [ "$DIRTY" -gt 0 ]; then
-  echo -e "${YELLOW}Uncommitted changes: $DIRTY files${NC}"
+  printf "%b\n" "${YELLOW}Uncommitted changes: $DIRTY files${NC}"
 else
-  echo -e "${GREEN}Working tree clean${NC}"
+  printf "%b\n" "${GREEN}Working tree clean${NC}"
 fi
 
 section "Docker"
 if command -v docker &>/dev/null && docker compose ps --format json 2>/dev/null | head -1 | grep -q '{'; then
   docker compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || echo "No containers running"
 else
-  echo -e "${YELLOW}Docker not available or no compose file${NC}"
+  printf "%b\n" "${YELLOW}Docker not available or no compose file${NC}"
 fi
 
 section "Dependencies"
 if [ -d "node_modules" ]; then
-  echo -e "${GREEN}node_modules exists${NC}"
+  printf "%b\n" "${GREEN}node_modules exists${NC}"
 else
-  echo -e "${RED}node_modules missing — run your package manager install${NC}"
+  printf "%b\n" "${RED}node_modules missing — run your package manager install${NC}"
 fi
 
 section "Recent Commits"
@@ -42,7 +42,7 @@ section "Open PRs"
 if command -v gh &>/dev/null; then
   gh pr list --state open --limit 5 2>/dev/null || echo "Could not fetch PRs"
 else
-  echo -e "${YELLOW}gh CLI not installed — skipping${NC}"
+  printf "%b\n" "${YELLOW}gh CLI not installed — skipping${NC}"
 fi
 
 echo ""
