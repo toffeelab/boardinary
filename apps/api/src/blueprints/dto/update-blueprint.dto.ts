@@ -1,12 +1,20 @@
-import { IsString, IsOptional, IsArray, IsObject } from "class-validator";
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsObject,
+  MaxLength,
+} from "class-validator";
 
 export class UpdateBlueprintDto {
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   name?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   description?: string;
 
   @IsOptional()

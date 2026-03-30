@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsIn, IsArray, IsObject } from "class-validator";
+import {
+  IsString,
+  IsOptional,
+  IsIn,
+  IsArray,
+  IsObject,
+  IsNotEmpty,
+  MaxLength,
+} from "class-validator";
 
 export class CreateBlueprintDto {
   @IsIn(["preset", "flow"])
@@ -12,10 +20,13 @@ export class CreateBlueprintDto {
   orgId?: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
   name!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   description?: string;
 
   @IsObject()

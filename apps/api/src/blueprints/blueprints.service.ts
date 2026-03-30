@@ -42,6 +42,16 @@ export class BlueprintsService {
     }
 
     if (scope === "organization" && orgId) {
+      const membership = await db
+        .select()
+        .from(orgMembers)
+        .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, userId)))
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw new ForbiddenException("Not a member of this organization");
+      }
+
       return db
         .select({
           id: blueprints.id,
@@ -135,6 +145,20 @@ export class BlueprintsService {
       );
     }
 
+    if (dto.scope === "organization" && dto.orgId) {
+      const membership = await db
+        .select()
+        .from(orgMembers)
+        .where(
+          and(eq(orgMembers.orgId, dto.orgId), eq(orgMembers.userId, userId)),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw new ForbiddenException("Not a member of this organization");
+      }
+    }
+
     const rows = await db
       .insert(blueprints)
       .values({
@@ -160,7 +184,7 @@ export class BlueprintsService {
 
     await this.ensureBlueprintAccess(existing!, userId);
 
-    const updateData: Record<string, unknown> = {};
+    const updateData: Partial<typeof blueprints.$inferInsert> = {};
     if (dto.name !== undefined) updateData.name = dto.name;
     if (dto.description !== undefined) updateData.description = dto.description;
     if (dto.content !== undefined) updateData.content = dto.content;
