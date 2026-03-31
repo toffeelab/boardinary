@@ -1,4 +1,10 @@
-import type { ApiErrorResponse } from "@repo/types";
+import type {
+  ApiErrorResponse,
+  BlueprintDto,
+  BlueprintMetaDto,
+  CreateBlueprintDto,
+  UpdateBlueprintDto,
+} from "@repo/types";
 
 const API_URL = process.env.API_URL ?? "http://localhost:4001";
 const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET ?? "";
@@ -41,10 +47,12 @@ export async function apiClient<T>(
     });
 
     if (!res.ok) {
-      const error = await res.json().catch((): ApiErrorResponse => ({
-        statusCode: res.status,
-        message: `API error: ${res.status}`,
-      }));
+      const error = await res.json().catch(
+        (): ApiErrorResponse => ({
+          statusCode: res.status,
+          message: `API error: ${res.status}`,
+        }),
+      );
       throw new ApiError(
         typeof error?.message === "string"
           ? error.message
@@ -57,4 +65,37 @@ export async function apiClient<T>(
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export async function getBlueprints(
+  scope: "personal" | "organization",
+  orgId?: string,
+) {
+  const params = new URLSearchParams({ scope });
+  if (orgId) params.set("orgId", orgId);
+  return apiClient<BlueprintMetaDto[]>(`/blueprints?${params}`);
+}
+
+export async function getBlueprintById(id: string) {
+  return apiClient<BlueprintDto>(`/blueprints/${id}`);
+}
+
+export async function createBlueprint(data: CreateBlueprintDto) {
+  return apiClient<BlueprintDto>("/blueprints", {
+    method: "POST",
+    body: data,
+  });
+}
+
+export async function updateBlueprint(id: string, data: UpdateBlueprintDto) {
+  return apiClient<BlueprintDto>(`/blueprints/${id}`, {
+    method: "PATCH",
+    body: data,
+  });
+}
+
+export async function deleteBlueprint(id: string) {
+  return apiClient<{ success: boolean }>(`/blueprints/${id}`, {
+    method: "DELETE",
+  });
 }
