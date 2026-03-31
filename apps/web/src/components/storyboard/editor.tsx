@@ -16,12 +16,13 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
-import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import type { StoryboardContentV1, StoryboardNodeData } from "@repo/types";
 import { migrateContent } from "@/lib/content-migration";
 import { instantiateBlueprint } from "@/lib/blueprint-utils";
 import { useEditorStore } from "@/stores/editor-store";
 import { useAutoSave } from "./hooks/use-auto-save";
+import { useBlueprintAutoSave } from "./hooks/use-blueprint-auto-save";
 import { useUndoRedo } from "./hooks/use-undo-redo";
 import { useEditorShortcuts } from "./hooks/use-editor-shortcuts";
 import { Canvas } from "./canvas";
@@ -38,13 +39,34 @@ import { SaveBlueprintDialog } from "./panels/save-blueprint-dialog";
 import type { StoryboardTemplate } from "./templates";
 import { extractBlueprintContent } from "@/lib/blueprint-utils";
 
-interface StoryboardEditorProps {
+interface StoryboardEditorBaseProps {
+  initialContent: Record<string, unknown>;
+  mode?: "storyboard" | "blueprint";
+}
+
+interface StoryboardModeProps extends StoryboardEditorBaseProps {
+  mode?: "storyboard";
   storyboardId: string;
   userId: string;
-  initialContent: Record<string, unknown>;
   initialContentVersion: number;
   storyboardName: string;
+  blueprintId?: never;
+  blueprintName?: never;
+  contentVersion?: never;
 }
+
+interface BlueprintModeProps extends StoryboardEditorBaseProps {
+  mode: "blueprint";
+  blueprintId: string;
+  blueprintName: string;
+  contentVersion: number;
+  storyboardId?: never;
+  userId?: never;
+  initialContentVersion?: never;
+  storyboardName?: never;
+}
+
+type StoryboardEditorProps = StoryboardModeProps | BlueprintModeProps;
 
 type AddableNodeType =
   | "scene"
@@ -124,13 +146,19 @@ export function StoryboardEditor(props: StoryboardEditorProps) {
   );
 }
 
-function EditorInner({
-  storyboardId,
-  userId,
-  initialContent,
-  initialContentVersion,
-  storyboardName,
-}: StoryboardEditorProps) {
+function EditorInner(props: StoryboardEditorProps) {
+  const { initialContent, mode = "storyboard" } = props;
+
+  // Mode-specific values
+  const isBlueprint = mode === "blueprint";
+  const storyboardId = isBlueprint ? "" : props.storyboardId;
+  const userId = isBlueprint ? "" : props.userId;
+  const editorName = isBlueprint
+    ? `블루프린트 편집: ${props.blueprintName}`
+    : props.storyboardName;
+  const initialContentVersionValue = isBlueprint
+    ? props.contentVersion
+    : props.initialContentVersion;
   const reactFlowInstance = useReactFlow();
 
   // Parse and migrate content
@@ -166,8 +194,8 @@ function EditorInner({
 
   // Initialize content version
   useEffect(() => {
-    setContentVersion(initialContentVersion);
-  }, [initialContentVersion, setContentVersion]);
+    setContentVersion(initialContentVersionValue);
+  }, [initialContentVersionValue, setContentVersion]);
 
   // Viewport ref for auto-save — sync with React Flow's actual viewport on mount
   const viewportRef = useRef<Viewport>({ x: 0, y: 0, zoom: 1 });
@@ -178,13 +206,21 @@ function EditorInner({
   // Track unsaved changes
   const hasUnsavedChanges = useRef(false);
 
-  // Hooks
-  const { debouncedSave, immediateSave } = useAutoSave({
+  // Hooks — auto-save differs based on mode
+  const storyboardAutoSave = useAutoSave({
     storyboardId,
     userId,
     viewportRef: viewportRef as React.RefObject<Viewport>,
     hasUnsavedChangesRef: hasUnsavedChanges as React.RefObject<boolean>,
   });
+  const blueprintAutoSave = useBlueprintAutoSave({
+    blueprintId: isBlueprint ? props.blueprintId : "",
+    viewportRef: viewportRef as React.RefObject<Viewport>,
+    hasUnsavedChangesRef: hasUnsavedChanges as React.RefObject<boolean>,
+  });
+  const { debouncedSave, immediateSave } = isBlueprint
+    ? blueprintAutoSave
+    : storyboardAutoSave;
   const { pushSnapshot, undo, redo } = useUndoRedo();
 
   // Mark dirty and trigger debounced save
@@ -849,9 +885,21 @@ function EditorInner({
     <div className="flex h-full flex-col">
       {/* Save status bar */}
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
-        <h1 className="truncate text-sm font-semibold text-foreground">
-          {storyboardName}
-        </h1>
+        <div className="flex min-w-0 items-center gap-2">
+          {isBlueprint && (
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="뒤로가기"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          )}
+          <h1 className="truncate text-sm font-semibold text-foreground">
+            {editorName}
+          </h1>
+        </div>
         {statusText && (
           <span className={`text-xs ${statusColor}`}>{statusText}</span>
         )}
