@@ -8,9 +8,7 @@ function ConditionNodeComponent({ data, selected }: NodeProps) {
   return (
     <div
       className={`rounded-lg border-2 bg-card px-4 py-3 shadow-sm transition-colors ${
-        selected
-          ? "border-red-500 ring-2 ring-red-500/20"
-          : "border-border"
+        selected ? "border-red-500 ring-2 ring-red-500/20" : "border-border"
       }`}
       style={{
         minWidth: 180,
@@ -48,7 +46,12 @@ function ConditionNodeComponent({ data, selected }: NodeProps) {
             position={Position.Right}
             id="true"
             className="bg-green-500! w-2.5! h-2.5!"
-            style={{ top: "auto" }}
+            style={{
+              position: "absolute",
+              right: -20,
+              top: "50%",
+              transform: "translateY(-50%)",
+            }}
           />
         </div>
         <div className="relative flex items-center">
@@ -58,7 +61,12 @@ function ConditionNodeComponent({ data, selected }: NodeProps) {
             position={Position.Right}
             id="false"
             className="bg-red-500! w-2.5! h-2.5!"
-            style={{ top: "auto" }}
+            style={{
+              position: "absolute",
+              right: -20,
+              top: "50%",
+              transform: "translateY(-50%)",
+            }}
           />
         </div>
       </div>

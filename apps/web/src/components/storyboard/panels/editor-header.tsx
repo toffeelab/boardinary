@@ -32,6 +32,8 @@ interface EditorHeaderProps {
   onSave: () => void;
   onSaveAsBlueprint: () => void;
   onBack?: () => void;
+  onTitleChange?: (newTitle: string) => void;
+  hideBlueprintSave?: boolean;
 }
 
 const PRESET_LABELS: Record<LayoutPreset, string> = {
@@ -48,6 +50,8 @@ export function EditorHeader({
   onSave,
   onSaveAsBlueprint,
   onBack,
+  onTitleChange,
+  hideBlueprintSave = false,
 }: EditorHeaderProps) {
   const { saveStatus, undoStack, redoStack, layoutPreset, setLayoutPreset } =
     useEditorStore();
@@ -89,9 +93,19 @@ export function EditorHeader({
               <TooltipContent>뒤로</TooltipContent>
             </Tooltip>
           )}
-          <h1 className="truncate text-sm font-semibold text-foreground">
-            {title}
-          </h1>
+          {onTitleChange ? (
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => onTitleChange(e.target.value)}
+              className="min-w-0 truncate bg-transparent text-base font-bold text-foreground outline-none border-b border-transparent hover:border-border focus:border-primary transition-colors"
+              placeholder="제목 없음"
+            />
+          ) : (
+            <h1 className="truncate text-base font-bold text-foreground">
+              {title}
+            </h1>
+          )}
 
           <div className="mx-1 h-5 w-px bg-border" />
 
@@ -152,26 +166,28 @@ export function EditorHeader({
             <TooltipContent>저장 (Ctrl+S)</TooltipContent>
           </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onSaveAsBlueprint}
-                disabled={!hasSelectedNodes}
-                className="gap-1.5"
-              >
-                <Bookmark className="h-4 w-4" />
-                <span className="hidden md:inline">블루프린트 저장</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {hasSelectedNodes
-                ? "선택한 노드를 블루프린트로 저장 (Ctrl+Shift+B)"
-                : "노드를 선택해주세요"}
-            </TooltipContent>
-          </Tooltip>
+          {!hideBlueprintSave && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onSaveAsBlueprint}
+                  disabled={!hasSelectedNodes}
+                  className="gap-1.5"
+                >
+                  <Bookmark className="h-4 w-4" />
+                  <span className="hidden md:inline">블루프린트 저장</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {hasSelectedNodes
+                  ? "선택한 노드를 블루프린트로 저장 (Ctrl+Shift+B)"
+                  : "노드를 선택해주세요"}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
         {/* Right: Layout dropdown */}

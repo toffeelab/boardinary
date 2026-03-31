@@ -118,6 +118,31 @@ function createDefaultNodeData(type: AddableNodeType): StoryboardNodeData {
   return base;
 }
 
+/** Find a position that doesn't overlap with existing nodes */
+function findNonOverlappingPosition(
+  baseX: number,
+  baseY: number,
+  existingNodes: Node[],
+): { x: number; y: number } {
+  let x = baseX;
+  let y = baseY;
+  const OFFSET = 50;
+  const TOLERANCE = 20;
+
+  while (
+    existingNodes.some(
+      (n) =>
+        Math.abs(n.position.x - x) < TOLERANCE &&
+        Math.abs(n.position.y - y) < TOLERANCE,
+    )
+  ) {
+    x += OFFSET;
+    y += OFFSET;
+  }
+
+  return { x, y };
+}
+
 function contentToReactFlow(content: StoryboardContentV1): {
   nodes: Node[];
   edges: Edge[];
@@ -158,9 +183,10 @@ function EditorInner(props: StoryboardEditorProps) {
   const router = useRouter();
   const storyboardId = props.storyboardId ?? "";
   const userId = props.userId ?? "";
-  const editorName = isBlueprint
-    ? `블루프린트 편집: ${props.blueprintName}`
+  const initialName = isBlueprint
+    ? (props.blueprintName ?? "")
     : (props.storyboardName ?? "");
+  const [editorName, setEditorName] = useState(initialName);
   const initialContentVersionValue =
     props.contentVersion ?? props.initialContentVersion ?? 0;
   const blueprintId = props.blueprintId ?? "";
@@ -339,10 +365,18 @@ function EditorInner(props: StoryboardEditorProps) {
 
       const maxZ = Math.max(0, ...nodesRef.current.map((n) => n.zIndex ?? 0));
 
+      const baseX = centerX - 100;
+      const baseY = centerY - 50;
+      const { x, y } = findNonOverlappingPosition(
+        baseX,
+        baseY,
+        nodesRef.current,
+      );
+
       const newNode: Node = {
         id: crypto.randomUUID(),
         type,
-        position: { x: centerX - 100, y: centerY - 50 },
+        position: { x, y },
         data: createDefaultNodeData(type) as unknown as Record<string, unknown>,
         zIndex: maxZ + 1,
       };
@@ -887,6 +921,8 @@ function EditorInner(props: StoryboardEditorProps) {
         onSave={handleShortcutSave}
         onSaveAsBlueprint={handleSaveAsBlueprint}
         onBack={isBlueprint ? () => router.back() : undefined}
+        onTitleChange={setEditorName}
+        hideBlueprintSave={isBlueprint}
       />
 
       {/* Main editor area */}

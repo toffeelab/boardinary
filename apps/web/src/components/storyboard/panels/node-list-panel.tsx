@@ -67,22 +67,8 @@ export function NodeListPanel({
 
   return (
     <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
-      <div className="flex items-center justify-between px-4 py-3">
-        <h2 className="truncate text-sm font-semibold text-foreground">
-          {effectiveTab === "elements" ? "요소 목록" : "블루프린트"}
-        </h2>
-        <button
-          type="button"
-          onClick={toggleNodeList}
-          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          aria-label="목록 닫기"
-        >
-          <PanelLeftClose className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Tab buttons */}
-      <div className="flex border-b border-border px-2">
+      {/* Tab buttons + close button */}
+      <div className="flex items-center border-b border-border px-2">
         <button
           type="button"
           onClick={() => setLeftPanelTab("elements")}
@@ -107,6 +93,14 @@ export function NodeListPanel({
             블루프린트
           </button>
         )}
+        <button
+          type="button"
+          onClick={toggleNodeList}
+          className="ml-auto shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="목록 닫기"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
       </div>
 
       {effectiveTab === "blueprints" ? (
