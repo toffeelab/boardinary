@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   Body,
+  BadRequestException,
 } from "@nestjs/common";
 import { CurrentUserId } from "../auth/current-user.decorator";
 import { BlueprintsService } from "./blueprints.service";
@@ -17,12 +18,24 @@ import { UpdateBlueprintDto } from "./dto/update-blueprint.dto";
 export class BlueprintsController {
   constructor(private readonly blueprintsService: BlueprintsService) {}
 
+  private static readonly VALID_SCOPES = ["personal", "organization"] as const;
+
   @Get()
   async getBlueprints(
     @CurrentUserId() userId: string,
     @Query("scope") scope: string,
     @Query("orgId") orgId?: string,
   ) {
+    if (
+      !scope ||
+      !BlueprintsController.VALID_SCOPES.includes(
+        scope as (typeof BlueprintsController.VALID_SCOPES)[number],
+      )
+    ) {
+      throw new BadRequestException(
+        "scope must be one of: personal, organization",
+      );
+    }
     return this.blueprintsService.getBlueprints(userId, scope, orgId);
   }
 

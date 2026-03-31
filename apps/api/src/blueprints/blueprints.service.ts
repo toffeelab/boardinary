@@ -83,17 +83,15 @@ export class BlueprintsService {
   }
 
   async getBlueprintById(id: string, userId?: string) {
-    const rows = await db
+    const [blueprint] = await db
       .select()
       .from(blueprints)
       .where(eq(blueprints.id, id))
       .limit(1);
 
-    if (rows.length === 0) {
+    if (!blueprint) {
       throw new NotFoundException("Blueprint not found");
     }
-
-    const blueprint = rows[0]!;
 
     if (userId !== undefined) {
       await this.ensureBlueprintAccess(blueprint, userId);
@@ -182,7 +180,7 @@ export class BlueprintsService {
   async updateBlueprint(id: string, userId: string, dto: UpdateBlueprintDto) {
     const existing = await this.getBlueprintById(id);
 
-    await this.ensureBlueprintAccess(existing!, userId);
+    await this.ensureBlueprintAccess(existing, userId);
 
     const updateData: Partial<typeof blueprints.$inferInsert> = {};
     if (dto.name !== undefined) updateData.name = dto.name;
@@ -206,7 +204,7 @@ export class BlueprintsService {
   async deleteBlueprint(id: string, userId: string) {
     const existing = await this.getBlueprintById(id);
 
-    await this.ensureBlueprintAccess(existing!, userId);
+    await this.ensureBlueprintAccess(existing, userId);
 
     await db.delete(blueprints).where(eq(blueprints.id, id));
     return { success: true };
