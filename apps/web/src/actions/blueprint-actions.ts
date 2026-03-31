@@ -14,26 +14,26 @@ export async function fetchBlueprints(
   scope: "personal" | "organization",
   orgId?: string,
 ) {
-  await getCurrentUserId();
-  return apiFetchBlueprints(scope, orgId);
+  const userId = await getCurrentUserId();
+  return apiFetchBlueprints(userId, scope, orgId);
 }
 
 export async function fetchBlueprintById(id: string) {
-  await getCurrentUserId();
-  return apiFetchBlueprint(id);
+  const userId = await getCurrentUserId();
+  return apiFetchBlueprint(userId, id);
 }
 
 export async function saveBlueprint(data: CreateBlueprintDto) {
-  await getCurrentUserId();
-  return apiCreateBlueprint(data);
+  const userId = await getCurrentUserId();
+  return apiCreateBlueprint(userId, data);
 }
 
 export async function editBlueprint(id: string, data: UpdateBlueprintDto) {
-  await getCurrentUserId();
-  return apiUpdateBlueprint(id, data);
+  const userId = await getCurrentUserId();
+  return apiUpdateBlueprint(userId, id, data);
 }
 
 export async function removeBlueprint(id: string) {
-  await getCurrentUserId();
-  return apiDeleteBlueprint(id);
+  const userId = await getCurrentUserId();
+  return apiDeleteBlueprint(userId, id);
 }

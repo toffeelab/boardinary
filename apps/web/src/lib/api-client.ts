@@ -68,34 +68,45 @@ export async function apiClient<T>(
 }
 
 export async function getBlueprints(
+  userId: string,
   scope: "personal" | "organization",
   orgId?: string,
 ) {
   const params = new URLSearchParams({ scope });
   if (orgId) params.set("orgId", orgId);
-  return apiClient<BlueprintMetaDto[]>(`/blueprints?${params}`);
+  return apiClient<BlueprintMetaDto[]>(`/api/blueprints?${params}`, { userId });
 }
 
-export async function getBlueprintById(id: string) {
-  return apiClient<BlueprintDto>(`/blueprints/${id}`);
+export async function getBlueprintById(userId: string, id: string) {
+  return apiClient<BlueprintDto>(`/api/blueprints/${id}`, { userId });
 }
 
-export async function createBlueprint(data: CreateBlueprintDto) {
-  return apiClient<BlueprintDto>("/blueprints", {
+export async function createBlueprint(
+  userId: string,
+  data: CreateBlueprintDto,
+) {
+  return apiClient<BlueprintDto>("/api/blueprints", {
     method: "POST",
     body: data,
+    userId,
   });
 }
 
-export async function updateBlueprint(id: string, data: UpdateBlueprintDto) {
-  return apiClient<BlueprintDto>(`/blueprints/${id}`, {
+export async function updateBlueprint(
+  userId: string,
+  id: string,
+  data: UpdateBlueprintDto,
+) {
+  return apiClient<BlueprintDto>(`/api/blueprints/${id}`, {
     method: "PATCH",
     body: data,
+    userId,
   });
 }
 
-export async function deleteBlueprint(id: string) {
-  return apiClient<{ success: boolean }>(`/blueprints/${id}`, {
+export async function deleteBlueprint(userId: string, id: string) {
+  return apiClient<{ success: boolean }>(`/api/blueprints/${id}`, {
     method: "DELETE",
+    userId,
   });
 }
