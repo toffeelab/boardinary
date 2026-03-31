@@ -16,15 +16,10 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
-import {
-  PanelLeftOpen,
-  PanelRightOpen,
-} from "lucide-react";
-import type {
-  StoryboardContentV1,
-  StoryboardNodeData,
-} from "@repo/types";
+import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import type { StoryboardContentV1, StoryboardNodeData } from "@repo/types";
 import { migrateContent } from "@/lib/content-migration";
+import { instantiateBlueprint } from "@/lib/blueprint-utils";
 import { useEditorStore } from "@/stores/editor-store";
 import { useAutoSave } from "./hooks/use-auto-save";
 import { useUndoRedo } from "./hooks/use-undo-redo";
@@ -315,15 +310,18 @@ function EditorInner({
 
       setSelectedNodeId(newNode.id);
     },
-    [pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave, setSelectedNodeId],
+    [
+      pushSnapshot,
+      setNodes,
+      reactFlowInstance,
+      markDirtyAndSave,
+      setSelectedNodeId,
+    ],
   );
 
   // Add node via drag-and-drop on canvas
   const handleNodeDrop = useCallback(
-    (
-      type: AddableNodeType,
-      position: { x: number; y: number },
-    ) => {
+    (type: AddableNodeType, position: { x: number; y: number }) => {
       pushSnapshot(nodesRef.current, edgesRef.current);
 
       const maxZ = Math.max(0, ...nodesRef.current.map((n) => n.zIndex ?? 0));
@@ -332,10 +330,7 @@ function EditorInner({
         id: crypto.randomUUID(),
         type,
         position,
-        data: createDefaultNodeData(type) as unknown as Record<
-          string,
-          unknown
-        >,
+        data: createDefaultNodeData(type) as unknown as Record<string, unknown>,
         zIndex: maxZ + 1,
       };
 
@@ -373,10 +368,14 @@ function EditorInner({
       setSelectedNodeId(nodeId);
       const node = nodesRef.current.find((n) => n.id === nodeId);
       if (node) {
-        reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, {
-          zoom: 1,
-          duration: 500,
-        });
+        reactFlowInstance.setCenter(
+          node.position.x + 100,
+          node.position.y + 50,
+          {
+            zoom: 1,
+            duration: 500,
+          },
+        );
       }
     },
     [setSelectedNodeId, reactFlowInstance],
@@ -615,21 +614,48 @@ function EditorInner({
     [pushSnapshot, setNodes, setEdges, markDirtyAndSave],
   );
 
+  // Blueprint insert handler
+  const handleBlueprintInsert = useCallback(
+    (content: { nodes: Node[]; edges: Edge[] }) => {
+      pushSnapshot(nodesRef.current, edgesRef.current);
+
+      const viewport = reactFlowInstance.getViewport();
+      const container = document.querySelector(".react-flow");
+      const width = container?.clientWidth ?? 800;
+      const height = container?.clientHeight ?? 600;
+      const centerX = (-viewport.x + width / 2) / viewport.zoom;
+      const centerY = (-viewport.y + height / 2) / viewport.zoom;
+
+      const { nodes: newNodes, edges: newEdges } = instantiateBlueprint(
+        content,
+        { x: centerX, y: centerY },
+      );
+
+      setNodes((nds) => {
+        const updated = [...nds, ...newNodes];
+        setEdges((eds) => {
+          const updatedEdges = [...eds, ...newEdges];
+          markDirtyAndSave(updated, updatedEdges);
+          return updatedEdges;
+        });
+        return updated;
+      });
+    },
+    [pushSnapshot, reactFlowInstance, setNodes, setEdges, markDirtyAndSave],
+  );
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
   } | null>(null);
 
-  const handleContextMenu = useCallback(
-    (event: React.MouseEvent) => {
-      const selectedNodes = nodesRef.current.filter((n) => n.selected);
-      if (selectedNodes.length < 2) return;
-      event.preventDefault();
-      setContextMenu({ x: event.clientX, y: event.clientY });
-    },
-    [],
-  );
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    const selectedNodes = nodesRef.current.filter((n) => n.selected);
+    if (selectedNodes.length < 2) return;
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY });
+  }, []);
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null);
@@ -816,7 +842,11 @@ function EditorInner({
       {/* Main editor area */}
       {(() => {
         const nodeListEl = (
-          <NodeListPanel nodes={nodes} onNodeSelect={handleNodeSelect} />
+          <NodeListPanel
+            nodes={nodes}
+            onNodeSelect={handleNodeSelect}
+            onBlueprintInsert={handleBlueprintInsert}
+          />
         );
         const propertyEl = (
           <PropertyPanel
@@ -826,8 +856,7 @@ function EditorInner({
           />
         );
 
-        const showNodeList =
-          layoutPreset !== "property-only" && isNodeListOpen;
+        const showNodeList = layoutPreset !== "property-only" && isNodeListOpen;
         const showProperty = isPropertyPanelOpen;
 
         // Determine left and right panel contents based on preset
@@ -854,7 +883,9 @@ function EditorInner({
           <div className="flex min-h-0 flex-1">
             {/* Left panel */}
             {leftPanel && (
-              <aside className={`shrink-0 overflow-hidden border-r ${layoutPreset === "reversed" ? "w-72" : "w-60"}`}>
+              <aside
+                className={`shrink-0 overflow-hidden border-r ${layoutPreset === "reversed" ? "w-72" : "w-60"}`}
+              >
                 {leftPanel}
               </aside>
             )}
@@ -865,8 +896,14 @@ function EditorInner({
                 <button
                   type="button"
                   className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-md border bg-card p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-                  onClick={layoutPreset === "reversed" ? togglePropertyPanel : toggleNodeList}
-                  aria-label={layoutPreset === "reversed" ? "속성 열기" : "목록 열기"}
+                  onClick={
+                    layoutPreset === "reversed"
+                      ? togglePropertyPanel
+                      : toggleNodeList
+                  }
+                  aria-label={
+                    layoutPreset === "reversed" ? "속성 열기" : "목록 열기"
+                  }
                 >
                   <PanelLeftOpen className="h-4 w-4" />
                 </button>
@@ -899,8 +936,14 @@ function EditorInner({
                 <button
                   type="button"
                   className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-md border bg-card p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-                  onClick={layoutPreset === "reversed" ? toggleNodeList : togglePropertyPanel}
-                  aria-label={layoutPreset === "reversed" ? "목록 열기" : "속성 열기"}
+                  onClick={
+                    layoutPreset === "reversed"
+                      ? toggleNodeList
+                      : togglePropertyPanel
+                  }
+                  aria-label={
+                    layoutPreset === "reversed" ? "목록 열기" : "속성 열기"
+                  }
                 >
                   <PanelRightOpen className="h-4 w-4" />
                 </button>
@@ -909,7 +952,9 @@ function EditorInner({
 
             {/* Right panel */}
             {rightPanel && (
-              <aside className={`shrink-0 overflow-hidden border-l ${layoutPreset === "reversed" ? "w-60" : "w-72"}`}>
+              <aside
+                className={`shrink-0 overflow-hidden border-l ${layoutPreset === "reversed" ? "w-60" : "w-72"}`}
+              >
                 {rightPanel}
               </aside>
             )}

@@ -1,15 +1,18 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Node } from "@xyflow/react";
+import type { Node, Edge } from "@xyflow/react";
 import { PanelLeftClose } from "lucide-react";
 import type { StoryboardNodeData } from "@repo/types";
 import { useEditorStore } from "@/stores/editor-store";
 import { Separator } from "@/components/ui/separator";
+import { BlueprintPanel } from "./blueprint-panel";
 
 interface NodeListPanelProps {
   nodes: Node[];
   onNodeSelect: (nodeId: string) => void;
+  onBlueprintInsert?: (content: { nodes: Node[]; edges: Edge[] }) => void;
+  orgId?: string;
 }
 
 const NODE_TYPE_CONFIG = {
@@ -23,8 +26,14 @@ const NODE_TYPE_CONFIG = {
 
 type NodeType = keyof typeof NODE_TYPE_CONFIG;
 
-export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
-  const { selectedNodeId, toggleNodeList } = useEditorStore();
+export function NodeListPanel({
+  nodes,
+  onNodeSelect,
+  onBlueprintInsert,
+  orgId,
+}: NodeListPanelProps) {
+  const { selectedNodeId, toggleNodeList, leftPanelTab, setLeftPanelTab } =
+    useEditorStore();
 
   const groupedNodes = useMemo(() => {
     const groups: Record<NodeType, Node[]> = {
@@ -50,7 +59,7 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
     <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
       <div className="flex items-center justify-between px-4 py-3">
         <h2 className="truncate text-sm font-semibold text-foreground">
-          요소 목록
+          {leftPanelTab === "elements" ? "요소 목록" : "블루프린트"}
         </h2>
         <button
           type="button"
@@ -61,54 +70,95 @@ export function NodeListPanel({ nodes, onNodeSelect }: NodeListPanelProps) {
           <PanelLeftClose className="h-4 w-4" />
         </button>
       </div>
-      <Separator />
-      <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-2">
-        {!hasNodes && (
-          <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-            툴바에서 요소를 추가하세요
-          </p>
-        )}
-        {hasNodes &&
-          (Object.entries(NODE_TYPE_CONFIG) as [NodeType, (typeof NODE_TYPE_CONFIG)[NodeType]][]).map(
-            ([type, config]) => {
-              const typeNodes = groupedNodes[type];
-              if (typeNodes.length === 0) return null;
-              return (
-                <div key={type} className="mb-3">
-                  <div className="flex items-center gap-2 px-2 py-1">
-                    <span
-                      className="inline-block h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: config.color }}
-                    />
-                    <span className="truncate text-xs font-medium text-muted-foreground">
-                      {config.label} ({typeNodes.length})
-                    </span>
-                  </div>
-                  <div className="space-y-0.5">
-                    {typeNodes.map((node) => {
-                      const nodeData = node.data as unknown as StoryboardNodeData;
-                      const isSelected = node.id === selectedNodeId;
-                      return (
-                        <button
-                          key={node.id}
-                          type="button"
-                          onClick={() => onNodeSelect(node.id)}
-                          className={`w-full truncate rounded-md px-3 py-1.5 text-left text-sm transition-colors ${
-                            isSelected
-                              ? "bg-accent text-accent-foreground"
-                              : "text-foreground hover:bg-accent/50"
-                          }`}
-                        >
-                          {nodeData.title || "제목 없음"}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            },
-          )}
+
+      {/* Tab buttons */}
+      <div className="flex border-b border-border px-2">
+        <button
+          type="button"
+          onClick={() => setLeftPanelTab("elements")}
+          className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
+            leftPanelTab === "elements"
+              ? "border-b-2 border-primary text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          요소
+        </button>
+        <button
+          type="button"
+          onClick={() => setLeftPanelTab("blueprints")}
+          className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
+            leftPanelTab === "blueprints"
+              ? "border-b-2 border-primary text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          블루프린트
+        </button>
       </div>
+
+      {leftPanelTab === "blueprints" ? (
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+          {onBlueprintInsert && (
+            <BlueprintPanel onInsert={onBlueprintInsert} orgId={orgId} />
+          )}
+        </div>
+      ) : (
+        <>
+          <Separator />
+          <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-2">
+            {!hasNodes && (
+              <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                툴바에서 요소를 추가하세요
+              </p>
+            )}
+            {hasNodes &&
+              (
+                Object.entries(NODE_TYPE_CONFIG) as [
+                  NodeType,
+                  (typeof NODE_TYPE_CONFIG)[NodeType],
+                ][]
+              ).map(([type, config]) => {
+                const typeNodes = groupedNodes[type];
+                if (typeNodes.length === 0) return null;
+                return (
+                  <div key={type} className="mb-3">
+                    <div className="flex items-center gap-2 px-2 py-1">
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: config.color }}
+                      />
+                      <span className="truncate text-xs font-medium text-muted-foreground">
+                        {config.label} ({typeNodes.length})
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      {typeNodes.map((node) => {
+                        const nodeData =
+                          node.data as unknown as StoryboardNodeData;
+                        const isSelected = node.id === selectedNodeId;
+                        return (
+                          <button
+                            key={node.id}
+                            type="button"
+                            onClick={() => onNodeSelect(node.id)}
+                            className={`w-full truncate rounded-md px-3 py-1.5 text-left text-sm transition-colors ${
+                              isSelected
+                                ? "bg-accent text-accent-foreground"
+                                : "text-foreground hover:bg-accent/50"
+                            }`}
+                          >
+                            {nodeData.title || "제목 없음"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </>
+      )}
     </aside>
   );
 }
