@@ -220,7 +220,6 @@ function EditorInner(props: StoryboardEditorProps) {
   });
   const blueprintAutoSave = useBlueprintAutoSave({
     blueprintId: blueprintId,
-    viewportRef: viewportRef as React.RefObject<Viewport>,
     hasUnsavedChangesRef: hasUnsavedChanges as React.RefObject<boolean>,
   });
   const { debouncedSave, immediateSave } = isBlueprint

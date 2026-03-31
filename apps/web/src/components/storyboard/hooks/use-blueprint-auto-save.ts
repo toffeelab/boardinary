@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import type { Node, Edge, Viewport } from "@xyflow/react";
+import type { Node, Edge } from "@xyflow/react";
 import type { StoryboardNode, StoryboardNodeData } from "@repo/types";
 import { useEditorStore } from "@/stores/editor-store";
 import { editBlueprint } from "@/actions/blueprint-actions";
@@ -31,13 +31,11 @@ function toBlueprintContent(nodes: Node[], edges: Edge[]) {
 
 interface UseBlueprintAutoSaveOptions {
   blueprintId: string;
-  viewportRef: React.RefObject<Viewport>;
   hasUnsavedChangesRef: React.RefObject<boolean>;
 }
 
 export function useBlueprintAutoSave({
   blueprintId,
-  viewportRef,
   hasUnsavedChangesRef,
 }: UseBlueprintAutoSaveOptions) {
   const { setSaveStatus } = useEditorStore();
@@ -70,7 +68,7 @@ export function useBlueprintAutoSave({
   );
 
   const immediateSave = useCallback(
-    (nodes: Node[], edges: Edge[], _viewport: Viewport) => {
+    (nodes: Node[], edges: Edge[]) => {
       if (timerRef.current) clearTimeout(timerRef.current);
       const content = toBlueprintContent(nodes, edges);
       void performSave(content as unknown as Record<string, unknown>);
