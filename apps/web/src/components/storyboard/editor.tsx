@@ -43,6 +43,7 @@ import { extractBlueprintContent } from "@/lib/blueprint-utils";
 interface StoryboardEditorBaseProps {
   initialContent: Record<string, unknown>;
   mode?: "storyboard" | "blueprint";
+  orgSlug?: string;
 }
 
 interface StoryboardModeProps extends StoryboardEditorBaseProps {
@@ -148,7 +149,7 @@ export function StoryboardEditor(props: StoryboardEditorProps) {
 }
 
 function EditorInner(props: StoryboardEditorProps) {
-  const { initialContent, mode = "storyboard" } = props;
+  const { initialContent, mode = "storyboard", orgSlug } = props;
 
   // Mode-specific values
   const isBlueprint = mode === "blueprint";
@@ -887,6 +888,7 @@ function EditorInner(props: StoryboardEditorProps) {
             nodes={nodes}
             onNodeSelect={handleNodeSelect}
             onBlueprintInsert={handleBlueprintInsert}
+            orgSlug={orgSlug}
           />
         );
         const propertyEl = (

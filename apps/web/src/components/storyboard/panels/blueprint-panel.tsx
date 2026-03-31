@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { Node, Edge } from "@xyflow/react";
-import { Loader2, Trash2 } from "lucide-react";
+import { Download, Loader2, Pencil, Trash2 } from "lucide-react";
 import { fetchBlueprints, removeBlueprint } from "@/actions/blueprint-actions";
 import { instantiateBlueprint } from "@/lib/blueprint-utils";
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +20,15 @@ interface BlueprintItem {
 interface BlueprintPanelProps {
   onInsert: (content: { nodes: Node[]; edges: Edge[] }) => void;
   orgId?: string;
+  orgSlug?: string;
 }
 
-export function BlueprintPanel({ onInsert, orgId }: BlueprintPanelProps) {
+export function BlueprintPanel({
+  onInsert,
+  orgId,
+  orgSlug,
+}: BlueprintPanelProps) {
+  const router = useRouter();
   const [blueprints, setBlueprints] = useState<BlueprintItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,20 +132,12 @@ export function BlueprintPanel({ onInsert, orgId }: BlueprintPanelProps) {
   }
 
   return (
-    <div className="space-y-1 px-2 py-2">
+    <div className="space-y-2 px-2 py-2">
       {blueprints.map((bp) => (
-        <div
-          key={bp.id}
-          className="group flex items-start gap-2 rounded-md px-2 py-2 transition-colors hover:bg-accent/50"
-        >
-          <button
-            type="button"
-            className="min-w-0 flex-1 text-left"
-            onClick={() => void handleInsert(bp.id)}
-            disabled={isPending}
-          >
+        <div key={bp.id} className="rounded-md border border-border bg-card">
+          <div className="px-3 py-2">
             <div className="flex items-center gap-1.5">
-              <span className="truncate text-sm font-medium text-foreground">
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                 {bp.name}
               </span>
               <Badge variant="secondary" className="shrink-0 text-[10px]">
@@ -150,17 +149,43 @@ export function BlueprintPanel({ onInsert, orgId }: BlueprintPanelProps) {
                 {bp.description}
               </p>
             )}
-          </button>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-            onClick={() => handleDelete(bp.id)}
-            disabled={isPending}
-            aria-label="삭제"
-          >
-            <Trash2 />
-          </Button>
+          </div>
+          <div className="flex items-center gap-1 border-t border-border px-2 py-1.5">
+            <Button
+              variant="default"
+              size="sm"
+              className="flex-1 gap-1 text-xs"
+              onClick={() => void handleInsert(bp.id)}
+              disabled={isPending}
+            >
+              <Download className="h-3 w-3" />
+              삽입
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 gap-1 text-xs"
+              onClick={() => {
+                if (orgSlug) {
+                  router.push(`/dashboard/${orgSlug}/blueprints/${bp.id}/edit`);
+                }
+              }}
+              disabled={!orgSlug || isPending}
+            >
+              <Pencil className="h-3 w-3" />
+              편집
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => handleDelete(bp.id)}
+              disabled={isPending}
+              aria-label="삭제"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       ))}
     </div>

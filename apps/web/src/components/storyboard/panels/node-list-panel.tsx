@@ -13,6 +13,7 @@ interface NodeListPanelProps {
   onNodeSelect: (nodeId: string) => void;
   onBlueprintInsert?: (content: { nodes: Node[]; edges: Edge[] }) => void;
   orgId?: string;
+  orgSlug?: string;
 }
 
 const NODE_TYPE_CONFIG = {
@@ -31,6 +32,7 @@ export function NodeListPanel({
   onNodeSelect,
   onBlueprintInsert,
   orgId,
+  orgSlug,
 }: NodeListPanelProps) {
   const { selectedNodeId, toggleNodeList, leftPanelTab, setLeftPanelTab } =
     useEditorStore();
@@ -100,7 +102,11 @@ export function NodeListPanel({
       {leftPanelTab === "blueprints" ? (
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           {onBlueprintInsert && (
-            <BlueprintPanel onInsert={onBlueprintInsert} orgId={orgId} />
+            <BlueprintPanel
+              onInsert={onBlueprintInsert}
+              orgId={orgId}
+              orgSlug={orgSlug}
+            />
           )}
         </div>
       ) : (
