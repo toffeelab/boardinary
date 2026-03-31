@@ -1,6 +1,13 @@
 "use client";
 
-import { Undo2, Redo2, Save, Bookmark, LayoutGrid } from "lucide-react";
+import {
+  Undo2,
+  Redo2,
+  Save,
+  Bookmark,
+  LayoutGrid,
+  ArrowLeft,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -24,6 +31,7 @@ interface EditorHeaderProps {
   onRedo: () => void;
   onSave: () => void;
   onSaveAsBlueprint: () => void;
+  onBack?: () => void;
 }
 
 const PRESET_LABELS: Record<LayoutPreset, string> = {
@@ -39,6 +47,7 @@ export function EditorHeader({
   onRedo,
   onSave,
   onSaveAsBlueprint,
+  onBack,
 }: EditorHeaderProps) {
   const { saveStatus, undoStack, redoStack, layoutPreset, setLayoutPreset } =
     useEditorStore();
@@ -64,6 +73,22 @@ export function EditorHeader({
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-1.5">
         {/* Left: Title + Undo/Redo */}
         <div className="flex min-w-0 items-center gap-2">
+          {onBack && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={onBack}
+                  aria-label="뒤로"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>뒤로</TooltipContent>
+            </Tooltip>
+          )}
           <h1 className="truncate text-sm font-semibold text-foreground">
             {title}
           </h1>

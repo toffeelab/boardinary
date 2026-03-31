@@ -14,6 +14,7 @@ interface NodeListPanelProps {
   onBlueprintInsert?: (content: { nodes: Node[]; edges: Edge[] }) => void;
   orgId?: string;
   orgSlug?: string;
+  hideBlueprintTab?: boolean;
 }
 
 const NODE_TYPE_CONFIG = {
@@ -33,9 +34,16 @@ export function NodeListPanel({
   onBlueprintInsert,
   orgId,
   orgSlug,
+  hideBlueprintTab = false,
 }: NodeListPanelProps) {
   const { selectedNodeId, toggleNodeList, leftPanelTab, setLeftPanelTab } =
     useEditorStore();
+
+  // When blueprint tab is hidden, force elements tab
+  const effectiveTab =
+    hideBlueprintTab && leftPanelTab === "blueprints"
+      ? "elements"
+      : leftPanelTab;
 
   const groupedNodes = useMemo(() => {
     const groups: Record<NodeType, Node[]> = {
@@ -61,7 +69,7 @@ export function NodeListPanel({
     <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-card">
       <div className="flex items-center justify-between px-4 py-3">
         <h2 className="truncate text-sm font-semibold text-foreground">
-          {leftPanelTab === "elements" ? "요소 목록" : "블루프린트"}
+          {effectiveTab === "elements" ? "요소 목록" : "블루프린트"}
         </h2>
         <button
           type="button"
@@ -79,27 +87,29 @@ export function NodeListPanel({
           type="button"
           onClick={() => setLeftPanelTab("elements")}
           className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
-            leftPanelTab === "elements"
+            effectiveTab === "elements"
               ? "border-b-2 border-primary text-foreground"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
           요소
         </button>
-        <button
-          type="button"
-          onClick={() => setLeftPanelTab("blueprints")}
-          className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
-            leftPanelTab === "blueprints"
-              ? "border-b-2 border-primary text-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          블루프린트
-        </button>
+        {!hideBlueprintTab && (
+          <button
+            type="button"
+            onClick={() => setLeftPanelTab("blueprints")}
+            className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors ${
+              effectiveTab === "blueprints"
+                ? "border-b-2 border-primary text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            블루프린트
+          </button>
+        )}
       </div>
 
-      {leftPanelTab === "blueprints" ? (
+      {effectiveTab === "blueprints" ? (
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           {onBlueprintInsert && (
             <BlueprintPanel

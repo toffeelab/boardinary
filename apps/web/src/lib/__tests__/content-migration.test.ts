@@ -170,6 +170,39 @@ describe("migrateContent", () => {
     expect(result.nodes[0]!.type).toBe("note");
   });
 
+  it("blueprint content format (no version, nodes array) is parsed correctly", () => {
+    const blueprintContent = {
+      nodes: [
+        {
+          id: "n1",
+          type: "scene",
+          position: { x: 50, y: 100 },
+          data: { title: "씬 1" },
+        },
+      ],
+      edges: [{ id: "e1", source: "n1", target: "n2" }],
+    };
+
+    const result = migrateContent(blueprintContent);
+    expect(result.version).toBe(1);
+    expect(result.nodes).toHaveLength(1);
+    expect(result.nodes[0]!.id).toBe("n1");
+    expect(result.edges).toHaveLength(1);
+    expect(result.viewport).toEqual({ x: 0, y: 0, zoom: 1 });
+  });
+
+  it("blueprint content with viewport is preserved", () => {
+    const blueprintContent = {
+      nodes: [],
+      edges: [],
+      viewport: { x: 10, y: 20, zoom: 2 },
+    };
+
+    const result = migrateContent(blueprintContent);
+    expect(result.version).toBe(1);
+    expect(result.viewport).toEqual({ x: 10, y: 20, zoom: 2 });
+  });
+
   it("filters out nodes with missing required fields", () => {
     const content = {
       version: 1,

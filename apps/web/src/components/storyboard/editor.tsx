@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ReactFlowProvider,
   useReactFlow,
@@ -154,6 +155,7 @@ function EditorInner(props: StoryboardEditorProps) {
 
   // Mode-specific values
   const isBlueprint = mode === "blueprint";
+  const router = useRouter();
   const storyboardId = props.storyboardId ?? "";
   const userId = props.userId ?? "";
   const editorName = isBlueprint
@@ -884,6 +886,7 @@ function EditorInner(props: StoryboardEditorProps) {
         onRedo={handleShortcutRedo}
         onSave={handleShortcutSave}
         onSaveAsBlueprint={handleSaveAsBlueprint}
+        onBack={isBlueprint ? () => router.back() : undefined}
       />
 
       {/* Main editor area */}
@@ -892,8 +895,9 @@ function EditorInner(props: StoryboardEditorProps) {
           <NodeListPanel
             nodes={nodes}
             onNodeSelect={handleNodeSelect}
-            onBlueprintInsert={handleBlueprintInsert}
+            onBlueprintInsert={isBlueprint ? undefined : handleBlueprintInsert}
             orgSlug={orgSlug}
+            hideBlueprintTab={isBlueprint}
           />
         );
         const propertyEl = (
