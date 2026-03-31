@@ -70,6 +70,15 @@ export async function updateStoryboardAction(formData: FormData) {
   }
 }
 
+export async function renameStoryboard(storyboardId: string, name: string) {
+  const userId = await getCurrentUserId();
+  await apiClient(`/api/storyboards/${storyboardId}`, {
+    method: "PATCH",
+    body: { name },
+    userId,
+  });
+}
+
 export async function deleteStoryboardAction(formData: FormData) {
   const userId = await getCurrentUserId();
   const storyboardId = formData.get("storyboardId") as string;

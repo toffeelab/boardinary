@@ -41,6 +41,8 @@ import { TemplateBrowser } from "./panels/template-browser";
 import { SaveBlueprintDialog } from "./panels/save-blueprint-dialog";
 import type { StoryboardTemplate } from "./templates";
 import { extractBlueprintContent } from "@/lib/blueprint-utils";
+import { renameStoryboard } from "@/actions/storyboard-actions";
+import { editBlueprint } from "@/actions/blueprint-actions";
 
 interface StoryboardEditorBaseProps {
   initialContent: Record<string, unknown>;
@@ -187,6 +189,7 @@ function EditorInner(props: StoryboardEditorProps) {
     ? (props.blueprintName ?? "")
     : (props.storyboardName ?? "");
   const [editorName, setEditorName] = useState(initialName);
+  const renameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialContentVersionValue =
     props.contentVersion ?? props.initialContentVersion ?? 0;
   const blueprintId = props.blueprintId ?? "";
@@ -621,6 +624,25 @@ function EditorInner(props: StoryboardEditorProps) {
     edges: Edge[];
   }>({ nodes: [], edges: [] });
 
+  const handleTitleChange = useCallback(
+    (newName: string) => {
+      setEditorName(newName);
+
+      if (renameTimerRef.current) clearTimeout(renameTimerRef.current);
+
+      if (!newName.trim()) return;
+
+      renameTimerRef.current = setTimeout(() => {
+        if (isBlueprint) {
+          void editBlueprint(blueprintId, { name: newName.trim() });
+        } else {
+          void renameStoryboard(storyboardId, newName.trim());
+        }
+      }, 1000);
+    },
+    [isBlueprint, blueprintId, storyboardId],
+  );
+
   const handleSaveAsBlueprint = useCallback(() => {
     const selectedNodes = nodesRef.current.filter((n) => n.selected);
     if (selectedNodes.length === 0) return;
@@ -921,7 +943,7 @@ function EditorInner(props: StoryboardEditorProps) {
         onSave={handleShortcutSave}
         onSaveAsBlueprint={handleSaveAsBlueprint}
         onBack={isBlueprint ? () => router.back() : undefined}
-        onTitleChange={setEditorName}
+        onTitleChange={handleTitleChange}
         hideBlueprintSave={isBlueprint}
       />
 
