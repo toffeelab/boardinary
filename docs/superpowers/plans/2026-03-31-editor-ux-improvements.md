@@ -17,6 +17,8 @@
 ### New Files
 
 - `apps/web/src/components/storyboard/panels/editor-header.tsx` — 헤더 유틸리티 바 컴포넌트 (Undo/Redo + 저장 + 블루프린트 저장 + 레이아웃)
+- `apps/web/src/lib/template-utils.ts` — 템플릿 추가 배치 오프셋 계산 순수 함수
+- `apps/web/src/lib/__tests__/template-utils.test.ts` — 오프셋 계산 테스트 (TDD)
 
 ### Modified Files
 
@@ -488,16 +490,106 @@ git commit -m "feat: add insert/edit/delete action buttons to blueprint panel it
 
 ---
 
-### Task 5: 템플릿 적용 확인 다이얼로그
+### Task 5: 템플릿 오프셋 유틸 (TDD) + 확인 다이얼로그
 
 **Files:**
 
+- Create: `apps/web/src/lib/template-utils.ts`
+- Create: `apps/web/src/lib/__tests__/template-utils.test.ts`
 - Modify: `apps/web/src/components/storyboard/panels/template-browser.tsx`
 - Modify: `apps/web/src/components/storyboard/editor.tsx`
 
-- [ ] **Step 1: template-browser.tsx에 nodeCount prop + 확인 UI 추가**
+#### Part A: TDD — 오프셋 계산 유틸
 
-TemplateBrowserProps에 `currentNodeCount: number` 추가. 적용 버튼 클릭 시 노드가 있으면 AlertDialog를 표시:
+- [ ] **Step 1: RED — 실패하는 테스트 작성**
+
+```ts
+// apps/web/src/lib/__tests__/template-utils.test.ts
+import { describe, it, expect } from "vitest";
+import { calcTemplateAppendOffset } from "../template-utils";
+import type { Node } from "@xyflow/react";
+
+const makeNode = (id: string, x: number, y: number, width?: number): Node => ({
+  id,
+  type: "scene",
+  position: { x, y },
+  data: {},
+  measured: width ? { width, height: 100 } : undefined,
+});
+
+describe("calcTemplateAppendOffset", () => {
+  it("기존 노드 없음 → offset 0", () => {
+    expect(calcTemplateAppendOffset([])).toBe(0);
+  });
+
+  it("단일 노드 (measured width 있음) → position.x + width + 300", () => {
+    const nodes = [makeNode("a", 100, 50, 200)];
+    expect(calcTemplateAppendOffset(nodes)).toBe(600); // 100 + 200 + 300
+  });
+
+  it("단일 노드 (measured width 없음) → position.x + 기본값(200) + 300", () => {
+    const nodes = [makeNode("a", 100, 50)];
+    expect(calcTemplateAppendOffset(nodes)).toBe(600); // 100 + 200 + 300
+  });
+
+  it("다중 노드 → 가장 우측 끝 + 300", () => {
+    const nodes = [
+      makeNode("a", 0, 0, 150),
+      makeNode("b", 500, 100, 200),
+      makeNode("c", 300, 200, 100),
+    ];
+    expect(calcTemplateAppendOffset(nodes)).toBe(1000); // 500 + 200 + 300
+  });
+});
+```
+
+- [ ] **Step 2: RED 확인 — 테스트 실패**
+
+Run: `pnpm --filter web test`
+Expected: `template-utils.test.ts` FAIL — 모듈 없음
+
+- [ ] **Step 3: GREEN — 최소 구현**
+
+```ts
+// apps/web/src/lib/template-utils.ts
+import type { Node } from "@xyflow/react";
+
+const DEFAULT_NODE_WIDTH = 200;
+const APPEND_GAP = 300;
+
+/**
+ * 기존 노드들의 가장 우측 끝 + 갭을 계산하여 템플릿 추가 배치 오프셋을 반환.
+ */
+export function calcTemplateAppendOffset(existingNodes: Node[]): number {
+  if (existingNodes.length === 0) return 0;
+
+  const maxX = Math.max(
+    ...existingNodes.map(
+      (n) => n.position.x + (n.measured?.width ?? DEFAULT_NODE_WIDTH),
+    ),
+  );
+
+  return maxX + APPEND_GAP;
+}
+```
+
+- [ ] **Step 4: GREEN 확인 — 테스트 통과**
+
+Run: `pnpm --filter web test`
+Expected: 모든 테스트 통과 (기존 39 + 신규 4 = 43+)
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add apps/web/src/lib/template-utils.ts apps/web/src/lib/__tests__/template-utils.test.ts
+git commit -m "feat: add calcTemplateAppendOffset util with TDD tests"
+```
+
+#### Part B: 확인 다이얼로그 UI + editor.tsx 통합
+
+- [ ] **Step 6: template-browser.tsx에 확인 UI 추가**
+
+TemplateBrowserProps에 `currentNodeCount: number`, `currentEdgeCount: number` 추가. 적용 버튼 클릭 시 노드가 있으면 AlertDialog 표시:
 
 ```tsx
 // template-browser.tsx 수정
@@ -549,7 +641,7 @@ function handleConfirmAppend() {
   }
 }
 
-// JSX 안에 AlertDialog 추가 (Dialog 닫힌 뒤):
+// JSX: Dialog 닫힌 뒤에 AlertDialog 추가
 <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
   <AlertDialogContent>
     <AlertDialogHeader>
@@ -575,10 +667,12 @@ function handleConfirmAppend() {
 </AlertDialog>;
 ```
 
-- [ ] **Step 2: editor.tsx — handleApplyTemplate에 mode 파라미터 추가**
+- [ ] **Step 7: editor.tsx — handleApplyTemplate에 mode 파라미터 + calcTemplateAppendOffset 사용**
 
 ```ts
 // editor.tsx 내 handleApplyTemplate 수정
+import { calcTemplateAppendOffset } from "@/lib/template-utils";
+
 function handleApplyTemplate(template: StoryboardTemplate, mode: "replace" | "append") {
   pushSnapshot();
 
@@ -586,22 +680,14 @@ function handleApplyTemplate(template: StoryboardTemplate, mode: "replace" | "ap
   const clonedEdges = /* 기존 엣지 클론 로직 */;
 
   if (mode === "replace") {
-    // 기존 전부 삭제 후 교체
     setNodes(clonedNodes);
     setEdges(clonedEdges);
   } else {
-    // 기존 노드 바운딩 박스 우측에 오프셋
-    const existingNodes = nodesRef.current;
-    const maxX = existingNodes.length > 0
-      ? Math.max(...existingNodes.map(n => n.position.x + (n.measured?.width ?? 200)))
-      : 0;
-    const offsetX = maxX + 300;
-
+    const offsetX = calcTemplateAppendOffset(nodesRef.current);
     const offsetNodes = clonedNodes.map(n => ({
       ...n,
       position: { x: n.position.x + offsetX, y: n.position.y },
     }));
-
     setNodes(nds => [...nds, ...offsetNodes]);
     setEdges(eds => [...eds, ...clonedEdges]);
   }
@@ -611,14 +697,14 @@ function handleApplyTemplate(template: StoryboardTemplate, mode: "replace" | "ap
 }
 ```
 
-TemplateBrowser 호출부에 `currentNodeCount={nodes.length}` 와 `currentEdgeCount={edges.length}` 전달.
+TemplateBrowser 호출부에 `currentNodeCount={nodes.length}`, `currentEdgeCount={edges.length}` 전달.
 
-- [ ] **Step 3: 빌드 + 테스트**
+- [ ] **Step 8: 빌드 + 테스트**
 
 Run: `pnpm --filter web check-types && pnpm --filter web test`
-Expected: 타입 체크 통과, 39 테스트 통과
+Expected: 타입 체크 통과, 43+ 테스트 통과
 
-- [ ] **Step 4: 커밋**
+- [ ] **Step 9: 커밋**
 
 ```bash
 git add apps/web/src/components/storyboard/panels/template-browser.tsx apps/web/src/components/storyboard/editor.tsx
@@ -627,29 +713,95 @@ git commit -m "feat: add template apply confirmation dialog with replace/append 
 
 ---
 
-### Task 6: 전체 검증
+### Task 6: 전체 검증 (QUALITY_SCORE.md 체크리스트)
 
-- [ ] **Step 1: 타입 체크**
+#### 자동 검증 (모든 변경에 필수)
 
-Run: `pnpm --filter web check-types`
-Expected: 성공
+- [ ] **Step 1: 테스트**
 
-- [ ] **Step 2: 테스트**
+Run: `pnpm --filter web test && pnpm --filter api test`
+Expected: web 43+ tests, api 25 tests — 모두 통과
 
-Run: `pnpm --filter web test`
-Expected: 39+ 테스트 통과
+- [ ] **Step 2: Lint**
 
-- [ ] **Step 3: E2E 확인**
+Run: `pnpm lint`
+Expected: 0 errors
 
-Docker + API + Web dev 서버 실행 후 Chrome DevTools MCP로:
+- [ ] **Step 3: 타입 체크**
 
-1. 에디터 진입 → 헤더에 Undo/Redo, 저장, 블루프린트 저장, 레이아웃 버튼 확인
+Run: `pnpm check-types`
+Expected: 0 errors
+
+- [ ] **Step 4: 빌드**
+
+Run: `pnpm --filter api build`
+Expected: exit 0 (web build는 기존 env 이슈로 worktree에서 실패할 수 있음 — CI에서 검증)
+
+#### 스펙 대비 요구사항 체크
+
+- [ ] **Step 5: 스펙 커버리지 확인**
+
+`docs/superpowers/specs/2026-03-31-editor-ux-improvements.md`를 읽고 항목별 구현 여부 확인:
+
+| 요구사항                     | 상태 | 근거 |
+| ---------------------------- | ---- | ---- |
+| 이슈 1: 헤더 유틸리티 바     |      |      |
+| 이슈 2: 템플릿 적용 확인     |      |      |
+| 이슈 3: 블루프린트 패널 액션 |      |      |
+| 이슈 4: Undo/Redo 가시성     |      |      |
+| 반응형: md 이상에서 텍스트   |      |      |
+| 터치 타겟 44px               |      |      |
+
+#### E2E 검증 (Chrome DevTools MCP)
+
+- [ ] **Step 6: 사전 준비**
+
+```bash
+docker compose up -d
+pnpm --filter @repo/db db:migrate
+# worktree에서 API + Web 실행
+cd .worktrees/phase2b-frontend
+pnpm --filter api dev &
+pnpm --filter web dev --port 4010 &
+```
+
+- [ ] **Step 7: E2E 시나리오 실행**
+
+Chrome DevTools MCP로:
+
+1. 에디터 진입 → 헤더에 Undo/Redo, 저장, 블루프린트 저장, 레이아웃 버튼 확인 → 스크린샷
 2. 하단바에 노드 추가 + 템플릿만 있는지 확인
-3. 노드 선택 → Ctrl+Shift+S → 다이얼로그 확인
-4. 블루프린트 탭 → 삽입/편집/삭제 버튼 확인
-5. 템플릿 적용 → 확인 다이얼로그(덮어쓰기/추가 배치) 확인
+3. 노드 선택 → 블루프린트 저장 버튼 활성화 확인 → 클릭 → 다이얼로그 확인 → 스크린샷
+4. 블루프린트 탭 → 삽입/편집/삭제 버튼 확인 → 스크린샷
+5. 템플릿 브라우저 → 기존 노드 있을 때 확인 다이얼로그 확인 → 스크린샷
+6. Undo/Redo 버튼 활성/비활성 상태 확인
 
-- [ ] **Step 4: 최종 커밋 (필요 시)**
+- [ ] **Step 8: 스크린샷 보관**
+
+```bash
+BRANCH=$(git branch --show-current)
+mkdir -p ".github/screenshots/${BRANCH}"
+# 스크린샷 파일을 해당 디렉토리에 저장
+git add .github/screenshots/
+git commit -m "chore: E2E 스크린샷 첨부"
+```
+
+#### 검증 결과 보고
+
+- [ ] **Step 9: 검증 결과 작성**
+
+```markdown
+## Verification
+
+- **Tests**: N files, M tests — all pass
+- **Lint**: 0 errors, 0 warnings
+- **Types**: 0 errors
+- **Build**: exit 0
+- **E2E**: N pages verified, 0 console errors
+- **Spec**: 모든 요구사항 충족
+```
+
+- [ ] **Step 10: 최종 커밋 (필요 시)**
 
 ```bash
 git add -A
