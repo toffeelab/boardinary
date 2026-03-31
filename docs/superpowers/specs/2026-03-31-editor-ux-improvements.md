@@ -161,6 +161,30 @@ templateOffsetX = maxX + 300
 | `panels/blueprint-panel.tsx`  | 항목 카드에 삽입/편집/삭제 버튼 추가              |
 | `stores/editor-store.ts`      | undoStack/redoStack length 셀렉터 추가 (optional) |
 
+## 컨벤션 준수 사항
+
+### FRONTEND.md 반응형
+
+- 헤더 유틸리티 바: 모바일(375px)에서 버튼 텍스트 숨김 → 아이콘만 표시. `sm:` 이상에서 텍스트 노출
+- 블루프린트 저장 버튼: 모바일에서 `📌` 아이콘만, `md:` 이상에서 "블루프린트 저장" 텍스트 노출
+- 레이아웃 드롭다운: 모바일에서 아이콘만, `md:` 이상에서 "레이아웃" 텍스트 노출
+- 터치 타겟: 모든 버튼 최소 44x44px (p-2 이상)
+
+### shadcn/ui 컴포넌트
+
+- 템플릿 확인 다이얼로그: `AlertDialog` 사용 (파괴적 액션 "덮어쓰기" 포함)
+- 블루프린트 삭제 확인: `AlertDialog` 사용
+- 툴팁: `Tooltip` + `TooltipTrigger` + `TooltipContent` (단축키 표시)
+- 드롭다운: 기존 `DropdownMenu` 패턴 유지
+- 저장 상태 표시: 커스텀 (dot + 텍스트)
+
+### ARCHITECTURE.md 불변 조건
+
+- `any` 금지 → `unknown` 사용
+- `console.log` 금지
+- 불필요한 `'use client'` 금지 — 새로 추가하는 컴포넌트는 Server Component 기본, 필요한 곳만 `'use client'`
+- 기존 editor.tsx는 이미 Client Component (React Flow 사용)
+
 ## 구현 우선순위
 
 1. 헤더 유틸리티 바 (Undo/Redo + 저장 + 블루프린트 저장 + 레이아웃)
