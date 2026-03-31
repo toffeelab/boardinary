@@ -34,7 +34,9 @@ import {
   type DistributeAxis,
 } from "./panels/context-menu";
 import { TemplateBrowser } from "./panels/template-browser";
+import { SaveBlueprintDialog } from "./panels/save-blueprint-dialog";
 import type { StoryboardTemplate } from "./templates";
+import { extractBlueprintContent } from "@/lib/blueprint-utils";
 
 interface StoryboardEditorProps {
   storyboardId: string;
@@ -543,7 +545,23 @@ function EditorInner({
     onDuplicate: handleDuplicate,
     onGroup: handleGroupNodes,
     onUngroup: handleUngroupNodes,
+    onSaveAsBlueprint: handleSaveAsBlueprint,
   });
+
+  // Save-as-blueprint dialog state
+  const [isSaveBlueprintOpen, setIsSaveBlueprintOpen] = useState(false);
+  const [saveBlueprintContent, setSaveBlueprintContent] = useState<{
+    nodes: Node[];
+    edges: Edge[];
+  }>({ nodes: [], edges: [] });
+
+  const handleSaveAsBlueprint = useCallback(() => {
+    const selectedNodes = nodesRef.current.filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+    const content = extractBlueprintContent(selectedNodes, edgesRef.current);
+    setSaveBlueprintContent(content);
+    setIsSaveBlueprintOpen(true);
+  }, []);
 
   // Template browser state
   const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
@@ -928,6 +946,7 @@ function EditorInner({
                     onDistribute={handleDistribute}
                     onGroup={handleGroupNodes}
                     onUngroup={handleUngroupNodes}
+                    onSaveAsBlueprint={handleSaveAsBlueprint}
                     onClose={handleCloseContextMenu}
                   />
                 )}
@@ -973,6 +992,13 @@ function EditorInner({
         open={isTemplateBrowserOpen}
         onClose={() => setIsTemplateBrowserOpen(false)}
         onApply={handleApplyTemplate}
+      />
+
+      {/* Save-as-blueprint dialog */}
+      <SaveBlueprintDialog
+        open={isSaveBlueprintOpen}
+        onOpenChange={setIsSaveBlueprintOpen}
+        content={saveBlueprintContent}
       />
     </div>
   );

@@ -9,6 +9,7 @@ interface UseEditorShortcutsOptions {
   onDuplicate: () => void;
   onGroup?: () => void;
   onUngroup?: () => void;
+  onSaveAsBlueprint?: () => void;
 }
 
 export function useEditorShortcuts({
@@ -18,11 +19,19 @@ export function useEditorShortcuts({
   onDuplicate,
   onGroup,
   onUngroup,
+  onSaveAsBlueprint,
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
+
+      // Ctrl+Shift+S: save as blueprint (must be checked before regular Ctrl+S)
+      if (e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        onSaveAsBlueprint?.();
+        return;
+      }
 
       switch (e.key.toLowerCase()) {
         case "s":
@@ -60,5 +69,13 @@ export function useEditorShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onSave, onUndo, onRedo, onDuplicate, onGroup, onUngroup]);
+  }, [
+    onSave,
+    onUndo,
+    onRedo,
+    onDuplicate,
+    onGroup,
+    onUngroup,
+    onSaveAsBlueprint,
+  ]);
 }
