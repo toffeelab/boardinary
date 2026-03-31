@@ -15,6 +15,13 @@
       "when": 1774423133030,
       "tag": "0001_custom_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774892166189,
+      "tag": "0002_breezy_triton",
+      "breakpoints": true
     }
   ]
 }

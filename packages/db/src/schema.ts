@@ -168,3 +168,51 @@ export const storyboards = pgTable(
     index("idx_storyboards_tags").using("gin", table.tags),
   ],
 );
+
+export const blueprintTypeEnum = pgEnum("blueprint_type", [
+  "preset",
+  "flow",
+  "template",
+]);
+
+export const blueprintScopeEnum = pgEnum("blueprint_scope", [
+  "personal",
+  "organization",
+  "project",
+]);
+
+export const blueprints = pgTable(
+  "blueprints",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => createId()),
+    type: blueprintTypeEnum("type").notNull(),
+    scope: blueprintScopeEnum("scope").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    orgId: text("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
+    projectId: text("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
+    name: text("name").notNull(),
+    description: text("description"),
+    content: jsonb("content").notNull().default({}),
+    contentVersion: integer("content_version").notNull().default(1),
+    tags: text("tags")
+      .array()
+      .default(sql`'{}'::text[]`),
+    icon: text("icon"),
+    color: text("color"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_blueprints_personal").on(table.createdBy),
+    index("idx_blueprints_org").on(table.orgId, table.type),
+    index("idx_blueprints_tags").using("gin", table.tags),
+  ],
+);
