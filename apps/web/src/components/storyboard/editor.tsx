@@ -151,14 +151,14 @@ function EditorInner(props: StoryboardEditorProps) {
 
   // Mode-specific values
   const isBlueprint = mode === "blueprint";
-  const storyboardId = isBlueprint ? "" : props.storyboardId;
-  const userId = isBlueprint ? "" : props.userId;
+  const storyboardId = props.storyboardId ?? "";
+  const userId = props.userId ?? "";
   const editorName = isBlueprint
     ? `블루프린트 편집: ${props.blueprintName}`
-    : props.storyboardName;
-  const initialContentVersionValue = isBlueprint
-    ? props.contentVersion
-    : props.initialContentVersion;
+    : (props.storyboardName ?? "");
+  const initialContentVersionValue =
+    props.contentVersion ?? props.initialContentVersion ?? 0;
+  const blueprintId = props.blueprintId ?? "";
   const reactFlowInstance = useReactFlow();
 
   // Parse and migrate content
@@ -214,7 +214,7 @@ function EditorInner(props: StoryboardEditorProps) {
     hasUnsavedChangesRef: hasUnsavedChanges as React.RefObject<boolean>,
   });
   const blueprintAutoSave = useBlueprintAutoSave({
-    blueprintId: isBlueprint ? props.blueprintId : "",
+    blueprintId: blueprintId,
     viewportRef: viewportRef as React.RefObject<Viewport>,
     hasUnsavedChangesRef: hasUnsavedChanges as React.RefObject<boolean>,
   });
@@ -573,17 +573,6 @@ function EditorInner(props: StoryboardEditorProps) {
     });
   }, [pushSnapshot, setNodes, markDirtyAndSave]);
 
-  // Wire keyboard shortcuts
-  useEditorShortcuts({
-    onSave: handleShortcutSave,
-    onUndo: handleShortcutUndo,
-    onRedo: handleShortcutRedo,
-    onDuplicate: handleDuplicate,
-    onGroup: handleGroupNodes,
-    onUngroup: handleUngroupNodes,
-    onSaveAsBlueprint: handleSaveAsBlueprint,
-  });
-
   // Save-as-blueprint dialog state
   const [isSaveBlueprintOpen, setIsSaveBlueprintOpen] = useState(false);
   const [saveBlueprintContent, setSaveBlueprintContent] = useState<{
@@ -598,6 +587,17 @@ function EditorInner(props: StoryboardEditorProps) {
     setSaveBlueprintContent(content);
     setIsSaveBlueprintOpen(true);
   }, []);
+
+  // Wire keyboard shortcuts
+  useEditorShortcuts({
+    onSave: handleShortcutSave,
+    onUndo: handleShortcutUndo,
+    onRedo: handleShortcutRedo,
+    onDuplicate: handleDuplicate,
+    onGroup: handleGroupNodes,
+    onUngroup: handleUngroupNodes,
+    onSaveAsBlueprint: handleSaveAsBlueprint,
+  });
 
   // Template browser state
   const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
