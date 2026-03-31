@@ -30,8 +30,8 @@ describe("extractBlueprintContent", () => {
     const nodes = [makeNode("a", 100, 200)];
     const result = extractBlueprintContent(nodes, []);
     expect(result.nodes).toHaveLength(1);
-    expect(result.nodes[0].position).toEqual({ x: 0, y: 0 });
-    expect(result.nodes[0].id).not.toBe("a"); // 새 ID
+    expect(result.nodes[0]!.position).toEqual({ x: 0, y: 0 });
+    expect(result.nodes[0]!.id).not.toBe("a"); // 새 ID
   });
 
   it("다중 노드 → flow (상대좌표 변환 + 엣지 포함)", () => {
@@ -42,24 +42,24 @@ describe("extractBlueprintContent", () => {
     ];
     const result = extractBlueprintContent(nodes, edges);
     expect(result.nodes).toHaveLength(2);
-    expect(result.nodes[0].position).toEqual({ x: 0, y: 0 });
-    expect(result.nodes[1].position).toEqual({ x: 200, y: 100 });
+    expect(result.nodes[0]!.position).toEqual({ x: 0, y: 0 });
+    expect(result.nodes[1]!.position).toEqual({ x: 200, y: 100 });
     expect(result.edges).toHaveLength(1); // 내부 엣지만
-    expect(result.edges[0].source).toBe(result.nodes[0].id);
-    expect(result.edges[0].target).toBe(result.nodes[1].id);
+    expect(result.edges[0]!.source).toBe(result.nodes[0]!.id);
+    expect(result.edges[0]!.target).toBe(result.nodes[1]!.id);
   });
 
   it("parentId가 선택 내 → 재매핑", () => {
     const parent = makeNode("p", 0, 0, "group");
     const child = { ...makeNode("c", 10, 10), parentId: "p" };
     const result = extractBlueprintContent([parent, child], []);
-    expect(result.nodes[1].parentId).toBe(result.nodes[0].id);
+    expect(result.nodes[1]!.parentId).toBe(result.nodes[0]!.id);
   });
 
   it("parentId가 선택 외 → undefined", () => {
     const child = { ...makeNode("c", 10, 10), parentId: "external-parent" };
     const result = extractBlueprintContent([child], []);
-    expect(result.nodes[0].parentId).toBeUndefined();
+    expect(result.nodes[0]!.parentId).toBeUndefined();
   });
 });
 
@@ -78,11 +78,11 @@ describe("instantiateBlueprint", () => {
       edges: [makeEdge("e1", "a", "b")],
     };
     const result = instantiateBlueprint(content, { x: 500, y: 300 });
-    expect(result.nodes[0].position).toEqual({ x: 500, y: 300 });
-    expect(result.nodes[1].position).toEqual({ x: 700, y: 400 });
-    expect(result.nodes[0].id).not.toBe("a");
-    expect(result.edges[0].source).toBe(result.nodes[0].id);
-    expect(result.edges[0].target).toBe(result.nodes[1].id);
+    expect(result.nodes[0]!.position).toEqual({ x: 500, y: 300 });
+    expect(result.nodes[1]!.position).toEqual({ x: 700, y: 400 });
+    expect(result.nodes[0]!.id).not.toBe("a");
+    expect(result.edges[0]!.source).toBe(result.nodes[0]!.id);
+    expect(result.edges[0]!.target).toBe(result.nodes[1]!.id);
   });
 });
 
