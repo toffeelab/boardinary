@@ -10,6 +10,7 @@ import {
   AlignVerticalSpaceBetween,
   Group,
   Ungroup,
+  Bookmark,
 } from "lucide-react";
 
 export type AlignDirection = "left" | "right" | "top" | "bottom";
@@ -22,6 +23,7 @@ interface ContextMenuProps {
   onDistribute: (axis: DistributeAxis) => void;
   onGroup: () => void;
   onUngroup: () => void;
+  onSaveAsBlueprint?: () => void;
   onClose: () => void;
 }
 
@@ -32,13 +34,17 @@ export function ContextMenu({
   onDistribute,
   onGroup,
   onUngroup,
+  onSaveAsBlueprint,
   onClose,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const handleClickOutside = useCallback(
     (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as HTMLElement)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as HTMLElement)
+      ) {
         onClose();
       }
     },
@@ -174,6 +180,25 @@ export function ContextMenu({
           <span className="text-xs text-muted-foreground">{item.shortcut}</span>
         </button>
       ))}
+      {onSaveAsBlueprint && (
+        <>
+          <div className="my-1 h-px bg-border" />
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground"
+            onClick={() => {
+              onSaveAsBlueprint();
+              onClose();
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <Bookmark className="h-4 w-4" />
+              블루프린트로 저장
+            </span>
+            <span className="text-xs text-muted-foreground">Ctrl+Shift+S</span>
+          </button>
+        </>
+      )}
     </div>
   );
 }
