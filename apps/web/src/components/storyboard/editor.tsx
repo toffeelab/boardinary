@@ -21,6 +21,7 @@ import { EditorHeader } from "./panels/editor-header";
 import type { StoryboardContentV1, StoryboardNodeData } from "@repo/types";
 import { migrateContent } from "@/lib/content-migration";
 import { instantiateBlueprint } from "@/lib/blueprint-utils";
+import { calcTemplateAppendOffset } from "@/lib/template-utils";
 import { useEditorStore } from "@/stores/editor-store";
 import { useAutoSave } from "./hooks/use-auto-save";
 import { useBlueprintAutoSave } from "./hooks/use-blueprint-auto-save";
@@ -608,21 +609,14 @@ function EditorInner(props: StoryboardEditorProps) {
   const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
 
   const handleApplyTemplate = useCallback(
-    (template: StoryboardTemplate) => {
+    (template: StoryboardTemplate, mode: "replace" | "append") => {
       pushSnapshot(nodesRef.current, edgesRef.current);
 
       const currentNodes = nodesRef.current;
 
-      // Calculate bounding box of existing nodes
-      let offsetX = 0;
-      if (currentNodes.length > 0) {
-        let maxX = -Infinity;
-        for (const node of currentNodes) {
-          const w = node.measured?.width ?? node.width ?? 180;
-          maxX = Math.max(maxX, node.position.x + w);
-        }
-        offsetX = maxX + 200;
-      }
+      // Calculate offset: append places template to the right; replace starts at 0
+      const offsetX =
+        mode === "append" ? calcTemplateAppendOffset(currentNodes) : 0;
 
       // Build ID mapping: old template ID -> new unique ID
       const idMap = new Map<string, string>();
@@ -658,15 +652,27 @@ function EditorInner(props: StoryboardEditorProps) {
         ...(tEdge.label ? { label: tEdge.label } : {}),
       }));
 
-      setNodes((nds) => {
-        const updated = [...nds, ...clonedNodes];
-        setEdges((eds) => {
-          const updatedEdges = [...eds, ...clonedEdges];
-          markDirtyAndSave(updated, updatedEdges);
-          return updatedEdges;
+      if (mode === "replace") {
+        // Clear existing nodes/edges and set to cloned template content
+        setNodes(() => {
+          setEdges(() => {
+            markDirtyAndSave(clonedNodes, clonedEdges);
+            return clonedEdges;
+          });
+          return clonedNodes;
         });
-        return updated;
-      });
+      } else {
+        // Append cloned nodes/edges to existing content
+        setNodes((nds) => {
+          const updated = [...nds, ...clonedNodes];
+          setEdges((eds) => {
+            const updatedEdges = [...eds, ...clonedEdges];
+            markDirtyAndSave(updated, updatedEdges);
+            return updatedEdges;
+          });
+          return updated;
+        });
+      }
 
       setIsTemplateBrowserOpen(false);
     },
@@ -1017,6 +1023,8 @@ function EditorInner(props: StoryboardEditorProps) {
         open={isTemplateBrowserOpen}
         onClose={() => setIsTemplateBrowserOpen(false)}
         onApply={handleApplyTemplate}
+        currentNodeCount={nodes.length}
+        currentEdgeCount={edges.length}
       />
 
       {/* Save-as-blueprint dialog */}
