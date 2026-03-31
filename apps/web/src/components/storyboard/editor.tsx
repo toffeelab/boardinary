@@ -16,7 +16,8 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
-import { ArrowLeft, PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { EditorHeader } from "./panels/editor-header";
 import type { StoryboardContentV1, StoryboardNodeData } from "@repo/types";
 import { migrateContent } from "@/lib/content-migration";
 import { instantiateBlueprint } from "@/lib/blueprint-utils";
@@ -188,7 +189,6 @@ function EditorInner(props: StoryboardEditorProps) {
     layoutPreset,
     selectedNodeId,
     setSelectedNodeId,
-    saveStatus,
     setContentVersion,
   } = useEditorStore();
 
@@ -205,6 +205,9 @@ function EditorInner(props: StoryboardEditorProps) {
 
   // Track unsaved changes
   const hasUnsavedChanges = useRef(false);
+
+  // Track whether any nodes are selected (for blueprint save)
+  const [hasSelectedNodes, setHasSelectedNodes] = useState(false);
 
   // Hooks — auto-save differs based on mode
   const storyboardAutoSave = useAutoSave({
@@ -288,6 +291,7 @@ function EditorInner(props: StoryboardEditorProps) {
   const handleSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[] }) => {
       setSelectedNodeId(selectedNodes[0]?.id ?? null);
+      setHasSelectedNodes(selectedNodes.length > 0);
       // Sync selection state to nodesRef so group/align/distribute read fresh data
       const selectedIds = new Set(selectedNodes.map((n) => n.id));
       nodesRef.current = nodesRef.current.map((n) => ({
@@ -864,46 +868,17 @@ function EditorInner(props: StoryboardEditorProps) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
-  // Save status display
-  const statusText = {
-    idle: "",
-    saving: "저장 중...",
-    saved: "저장됨",
-    error: "저장 실패",
-    conflict: "충돌 발생",
-  }[saveStatus];
-
-  const statusColor = {
-    idle: "text-muted-foreground",
-    saving: "text-muted-foreground",
-    saved: "text-green-600",
-    error: "text-destructive",
-    conflict: "text-orange-500",
-  }[saveStatus];
-
   return (
     <div className="flex h-full flex-col">
-      {/* Save status bar */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
-        <div className="flex min-w-0 items-center gap-2">
-          {isBlueprint && (
-            <button
-              type="button"
-              onClick={() => window.history.back()}
-              className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              aria-label="뒤로가기"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-          )}
-          <h1 className="truncate text-sm font-semibold text-foreground">
-            {editorName}
-          </h1>
-        </div>
-        {statusText && (
-          <span className={`text-xs ${statusColor}`}>{statusText}</span>
-        )}
-      </div>
+      {/* Editor header with undo/redo, save, layout */}
+      <EditorHeader
+        title={editorName}
+        hasSelectedNodes={hasSelectedNodes}
+        onUndo={handleShortcutUndo}
+        onRedo={handleShortcutRedo}
+        onSave={handleShortcutSave}
+        onSaveAsBlueprint={handleSaveAsBlueprint}
+      />
 
       {/* Main editor area */}
       {(() => {
