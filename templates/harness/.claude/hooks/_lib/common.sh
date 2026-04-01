@@ -17,7 +17,7 @@ fi
 HOOK_INPUT=$(cat)
 
 # JSON 유효성 검증
-if ! echo "$HOOK_INPUT" | jq empty 2>/dev/null; then
+if ! printf '%s' "$HOOK_INPUT" | jq empty 2>/dev/null; then
   if [ "${HOOK_FAIL_OPEN:-0}" = "1" ]; then
     echo "WARNING: Failed to parse hook input JSON. Hook skipped." >&2
     exit 0
@@ -29,7 +29,7 @@ fi
 
 # === 공통 필드 추출 헬퍼 ===
 hook_get() {
-  echo "$HOOK_INPUT" | jq -r "$1 // empty"
+  printf '%s' "$HOOK_INPUT" | jq -r "$1 // empty"
 }
 
 # === 명령어 정규화 (보안 매칭용) ===

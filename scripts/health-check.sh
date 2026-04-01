@@ -36,7 +36,7 @@ else
 fi
 
 section "Recent Commits"
-git log --oneline -5 2>/dev/null || echo "No commits"
+git --no-pager log --oneline -5 2>/dev/null || echo "No commits"
 
 section "Open PRs"
 if command -v gh &>/dev/null; then

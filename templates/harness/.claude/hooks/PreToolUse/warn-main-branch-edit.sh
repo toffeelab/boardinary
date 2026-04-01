@@ -4,7 +4,7 @@
 # 보안 모드: fail-closed (기본)
 
 # === 설정 (init-harness.sh가 치환) ===
-PROTECTED_BRANCHES=("{{MAIN_BRANCH}}" "{{DEVELOP_BRANCH}}")
+PROTECTED_BRANCHES=("{{MAIN_BRANCH}}")
 ALLOWED_PATHS=("docs/")
 
 source "$(dirname "$0")/../_lib/common.sh"

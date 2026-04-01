@@ -28,17 +28,32 @@
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": ["sh .claude/hooks/PreToolUse/block-dangerous-commands.sh"]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .claude/hooks/PreToolUse/block-dangerous-commands.sh"
+          }
+        ]
       },
       {
         "matcher": "Edit|Write",
-        "hooks": ["sh .claude/hooks/PreToolUse/warn-main-branch-edit.sh"]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .claude/hooks/PreToolUse/warn-main-branch-edit.sh"
+          }
+        ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
-        "hooks": ["sh .claude/hooks/PostToolUse/auto-lint-on-write.sh"]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .claude/hooks/PostToolUse/auto-lint-on-write.sh"
+          }
+        ]
       }
     ]
   }
