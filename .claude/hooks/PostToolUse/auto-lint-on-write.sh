@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # auto-lint-on-write.sh — 파일 저장 후 자동 lint
 # 트리거: PostToolUse (matcher: Write|Edit)
 # 보안 모드: fail-open (lint는 정보 제공용)
