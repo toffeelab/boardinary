@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh .claude/hooks/PreToolUse/block-dangerous-commands.sh"
+            "command": "bash .claude/hooks/PreToolUse/block-dangerous-commands.sh"
           }
         ]
       },
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh .claude/hooks/PreToolUse/warn-main-branch-edit.sh"
+            "command": "bash .claude/hooks/PreToolUse/warn-main-branch-edit.sh"
           }
         ]
       }
@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh .claude/hooks/PostToolUse/auto-lint-on-write.sh"
+            "command": "bash .claude/hooks/PostToolUse/auto-lint-on-write.sh"
           }
         ]
       }
