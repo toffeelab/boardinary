@@ -30,6 +30,7 @@ import { useUndoRedo } from "./hooks/use-undo-redo";
 import { useEditorShortcuts } from "./hooks/use-editor-shortcuts";
 import { useCollaboration } from "@/hooks/use-collaboration";
 import { useCollaborationStore } from "@/stores/collaboration-slice";
+import { PresenceLayer } from "./presence-layer";
 import { Canvas } from "./canvas";
 import { Toolbar } from "./panels/toolbar";
 import { NodeListPanel } from "./panels/node-list-panel";
@@ -1167,6 +1168,7 @@ function EditorInner(props: StoryboardEditorProps) {
                   onNodeDrop={handleNodeDrop}
                   nodeClassName={nodeClassName}
                 />
+                <PresenceLayer />
                 {contextMenu && (
                   <ContextMenu
                     x={contextMenu.x}
