@@ -138,7 +138,7 @@ interface Operation {
 | `edge:update`     | C→S→C | `{ storyboardId, edge: Partial<Edge>, version }` | 엣지 수정                            |
 | `edge:delete`     | C→S→C | `{ storyboardId, edgeId, version }`              | 엣지 삭제                            |
 | `presence:update` | C→S→C | `{ cursor: {x,y} \| null, selectedNodeIds }`     | 커서/선택 (발신자 제외 브로드캐스트) |
-| `collab:conflict` | S→C   | `{ nodeId, yourValue, winnerValue }`             | 덮어쓰기 알림                        |
+| `collab:conflict` | S→C   | `{ nodeId }`                                     | 덮어쓰기 알림 (토스트만 표시)        |
 
 ---
 
@@ -159,6 +159,7 @@ interface Operation {
    ```
 5. 동일 nodeId에 대해 300ms 이내 다른 클라이언트 편집 감지 → 덮어씌워진 클라이언트에 `collab:conflict` 전송
    - 감지: Redis `storyboard:{id}:nodes:{nodeId}:lastWriter` (socketId + TTL 300ms)
+   - 페이로드: `{ nodeId }` 만 전송, 클라이언트는 토스트 표시 ("다른 사용자가 이 노드를 수정했습니다")
 6. 룸 브로드캐스트 (발신자 제외)
 
 **DB flush 전략:**
