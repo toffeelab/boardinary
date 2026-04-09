@@ -1,7 +1,4 @@
-import type {
-  StoryboardContentV1,
-  StoryboardNode,
-} from "@repo/types";
+import type { StoryboardContentV1, StoryboardNode } from "@repo/types";
 
 const EMPTY_CONTENT: StoryboardContentV1 = {
   version: 1,
@@ -48,6 +45,24 @@ export function migrateContent(raw: unknown): StoryboardContentV1 {
   // 빈 객체 (Phase 0 기본값)
   if (Object.keys(content).length === 0) return EMPTY_CONTENT;
 
+  // Blueprint content format (no version, has nodes directly)
+  if (Array.isArray(content.nodes) && content.version === undefined) {
+    const nodes = (content.nodes as Record<string, unknown>[])
+      .map((n) => sanitizeNode(n))
+      .filter((n): n is StoryboardNode => n !== null);
+
+    return {
+      version: 1,
+      viewport:
+        (content.viewport as StoryboardContentV1["viewport"]) ??
+        EMPTY_CONTENT.viewport,
+      nodes,
+      edges: (Array.isArray(content.edges)
+        ? content.edges
+        : []) as StoryboardContentV1["edges"],
+    };
+  }
+
   // version 1 검증
   if (content.version === 1) {
     const rawNodes = Array.isArray(content.nodes) ? content.nodes : [];
@@ -57,7 +72,8 @@ export function migrateContent(raw: unknown): StoryboardContentV1 {
 
     return {
       version: 1,
-      viewport: (content.viewport as StoryboardContentV1["viewport"]) ??
+      viewport:
+        (content.viewport as StoryboardContentV1["viewport"]) ??
         EMPTY_CONTENT.viewport,
       nodes,
       edges: (Array.isArray(content.edges)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ReactFlowProvider,
   useReactFlow,
@@ -16,17 +17,15 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
-import {
-  PanelLeftOpen,
-  PanelRightOpen,
-} from "lucide-react";
-import type {
-  StoryboardContentV1,
-  StoryboardNodeData,
-} from "@repo/types";
+import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { EditorHeader } from "./panels/editor-header";
+import type { StoryboardContentV1, StoryboardNodeData } from "@repo/types";
 import { migrateContent } from "@/lib/content-migration";
+import { instantiateBlueprint } from "@/lib/blueprint-utils";
+import { calcTemplateAppendOffset } from "@/lib/template-utils";
 import { useEditorStore } from "@/stores/editor-store";
 import { useAutoSave } from "./hooks/use-auto-save";
+import { useBlueprintAutoSave } from "./hooks/use-blueprint-auto-save";
 import { useUndoRedo } from "./hooks/use-undo-redo";
 import { useEditorShortcuts } from "./hooks/use-editor-shortcuts";
 import { Canvas } from "./canvas";
@@ -39,15 +38,41 @@ import {
   type DistributeAxis,
 } from "./panels/context-menu";
 import { TemplateBrowser } from "./panels/template-browser";
+import { SaveBlueprintDialog } from "./panels/save-blueprint-dialog";
 import type { StoryboardTemplate } from "./templates";
+import { extractBlueprintContent } from "@/lib/blueprint-utils";
+import { renameStoryboard } from "@/actions/storyboard-actions";
+import { editBlueprint } from "@/actions/blueprint-actions";
 
-interface StoryboardEditorProps {
+interface StoryboardEditorBaseProps {
+  initialContent: Record<string, unknown>;
+  mode?: "storyboard" | "blueprint";
+  orgSlug?: string;
+}
+
+interface StoryboardModeProps extends StoryboardEditorBaseProps {
+  mode?: "storyboard";
   storyboardId: string;
   userId: string;
-  initialContent: Record<string, unknown>;
   initialContentVersion: number;
   storyboardName: string;
+  blueprintId?: never;
+  blueprintName?: never;
+  contentVersion?: never;
 }
+
+interface BlueprintModeProps extends StoryboardEditorBaseProps {
+  mode: "blueprint";
+  blueprintId: string;
+  blueprintName: string;
+  contentVersion: number;
+  storyboardId?: never;
+  userId?: never;
+  initialContentVersion?: never;
+  storyboardName?: never;
+}
+
+type StoryboardEditorProps = StoryboardModeProps | BlueprintModeProps;
 
 type AddableNodeType =
   | "scene"
@@ -95,6 +120,31 @@ function createDefaultNodeData(type: AddableNodeType): StoryboardNodeData {
   return base;
 }
 
+/** Find a position that doesn't overlap with existing nodes */
+function findNonOverlappingPosition(
+  baseX: number,
+  baseY: number,
+  existingNodes: Node[],
+): { x: number; y: number } {
+  let x = baseX;
+  let y = baseY;
+  const OFFSET = 50;
+  const TOLERANCE = 20;
+
+  while (
+    existingNodes.some(
+      (n) =>
+        Math.abs(n.position.x - x) < TOLERANCE &&
+        Math.abs(n.position.y - y) < TOLERANCE,
+    )
+  ) {
+    x += OFFSET;
+    y += OFFSET;
+  }
+
+  return { x, y };
+}
+
 function contentToReactFlow(content: StoryboardContentV1): {
   nodes: Node[];
   edges: Edge[];
@@ -127,13 +177,22 @@ export function StoryboardEditor(props: StoryboardEditorProps) {
   );
 }
 
-function EditorInner({
-  storyboardId,
-  userId,
-  initialContent,
-  initialContentVersion,
-  storyboardName,
-}: StoryboardEditorProps) {
+function EditorInner(props: StoryboardEditorProps) {
+  const { initialContent, mode = "storyboard", orgSlug } = props;
+
+  // Mode-specific values
+  const isBlueprint = mode === "blueprint";
+  const router = useRouter();
+  const storyboardId = props.storyboardId ?? "";
+  const userId = props.userId ?? "";
+  const initialName = isBlueprint
+    ? (props.blueprintName ?? "")
+    : (props.storyboardName ?? "");
+  const [editorName, setEditorName] = useState(initialName);
+  const renameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialContentVersionValue =
+    props.contentVersion ?? props.initialContentVersion ?? 0;
+  const blueprintId = props.blueprintId ?? "";
   const reactFlowInstance = useReactFlow();
 
   // Parse and migrate content
@@ -163,14 +222,13 @@ function EditorInner({
     layoutPreset,
     selectedNodeId,
     setSelectedNodeId,
-    saveStatus,
     setContentVersion,
   } = useEditorStore();
 
   // Initialize content version
   useEffect(() => {
-    setContentVersion(initialContentVersion);
-  }, [initialContentVersion, setContentVersion]);
+    setContentVersion(initialContentVersionValue);
+  }, [initialContentVersionValue, setContentVersion]);
 
   // Viewport ref for auto-save — sync with React Flow's actual viewport on mount
   const viewportRef = useRef<Viewport>({ x: 0, y: 0, zoom: 1 });
@@ -181,13 +239,23 @@ function EditorInner({
   // Track unsaved changes
   const hasUnsavedChanges = useRef(false);
 
-  // Hooks
-  const { debouncedSave, immediateSave } = useAutoSave({
+  // Track whether any nodes are selected (for blueprint save)
+  const [hasSelectedNodes, setHasSelectedNodes] = useState(false);
+
+  // Hooks — auto-save differs based on mode
+  const storyboardAutoSave = useAutoSave({
     storyboardId,
     userId,
     viewportRef: viewportRef as React.RefObject<Viewport>,
     hasUnsavedChangesRef: hasUnsavedChanges as React.RefObject<boolean>,
   });
+  const blueprintAutoSave = useBlueprintAutoSave({
+    blueprintId: blueprintId,
+    hasUnsavedChangesRef: hasUnsavedChanges as React.RefObject<boolean>,
+  });
+  const { debouncedSave, immediateSave } = isBlueprint
+    ? blueprintAutoSave
+    : storyboardAutoSave;
   const { pushSnapshot, undo, redo } = useUndoRedo();
 
   // Mark dirty and trigger debounced save
@@ -255,6 +323,7 @@ function EditorInner({
   const handleSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[] }) => {
       setSelectedNodeId(selectedNodes[0]?.id ?? null);
+      setHasSelectedNodes(selectedNodes.length > 0);
       // Sync selection state to nodesRef so group/align/distribute read fresh data
       const selectedIds = new Set(selectedNodes.map((n) => n.id));
       nodesRef.current = nodesRef.current.map((n) => ({
@@ -299,10 +368,18 @@ function EditorInner({
 
       const maxZ = Math.max(0, ...nodesRef.current.map((n) => n.zIndex ?? 0));
 
+      const baseX = centerX - 100;
+      const baseY = centerY - 50;
+      const { x, y } = findNonOverlappingPosition(
+        baseX,
+        baseY,
+        nodesRef.current,
+      );
+
       const newNode: Node = {
         id: crypto.randomUUID(),
         type,
-        position: { x: centerX - 100, y: centerY - 50 },
+        position: { x, y },
         data: createDefaultNodeData(type) as unknown as Record<string, unknown>,
         zIndex: maxZ + 1,
       };
@@ -315,15 +392,18 @@ function EditorInner({
 
       setSelectedNodeId(newNode.id);
     },
-    [pushSnapshot, setNodes, reactFlowInstance, markDirtyAndSave, setSelectedNodeId],
+    [
+      pushSnapshot,
+      setNodes,
+      reactFlowInstance,
+      markDirtyAndSave,
+      setSelectedNodeId,
+    ],
   );
 
   // Add node via drag-and-drop on canvas
   const handleNodeDrop = useCallback(
-    (
-      type: AddableNodeType,
-      position: { x: number; y: number },
-    ) => {
+    (type: AddableNodeType, position: { x: number; y: number }) => {
       pushSnapshot(nodesRef.current, edgesRef.current);
 
       const maxZ = Math.max(0, ...nodesRef.current.map((n) => n.zIndex ?? 0));
@@ -332,10 +412,7 @@ function EditorInner({
         id: crypto.randomUUID(),
         type,
         position,
-        data: createDefaultNodeData(type) as unknown as Record<
-          string,
-          unknown
-        >,
+        data: createDefaultNodeData(type) as unknown as Record<string, unknown>,
         zIndex: maxZ + 1,
       };
 
@@ -373,10 +450,14 @@ function EditorInner({
       setSelectedNodeId(nodeId);
       const node = nodesRef.current.find((n) => n.id === nodeId);
       if (node) {
-        reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 50, {
-          zoom: 1,
-          duration: 500,
-        });
+        reactFlowInstance.setCenter(
+          node.position.x + 100,
+          node.position.y + 50,
+          {
+            zoom: 1,
+            duration: 500,
+          },
+        );
       }
     },
     [setSelectedNodeId, reactFlowInstance],
@@ -536,6 +617,40 @@ function EditorInner({
     });
   }, [pushSnapshot, setNodes, markDirtyAndSave]);
 
+  // Save-as-blueprint dialog state
+  const [isSaveBlueprintOpen, setIsSaveBlueprintOpen] = useState(false);
+  const [saveBlueprintContent, setSaveBlueprintContent] = useState<{
+    nodes: Node[];
+    edges: Edge[];
+  }>({ nodes: [], edges: [] });
+
+  const handleTitleChange = useCallback(
+    (newName: string) => {
+      setEditorName(newName);
+
+      if (renameTimerRef.current) clearTimeout(renameTimerRef.current);
+
+      if (!newName.trim()) return;
+
+      renameTimerRef.current = setTimeout(() => {
+        if (isBlueprint) {
+          void editBlueprint(blueprintId, { name: newName.trim() });
+        } else {
+          void renameStoryboard(storyboardId, newName.trim());
+        }
+      }, 1000);
+    },
+    [isBlueprint, blueprintId, storyboardId],
+  );
+
+  const handleSaveAsBlueprint = useCallback(() => {
+    const selectedNodes = nodesRef.current.filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+    const content = extractBlueprintContent(selectedNodes, edgesRef.current);
+    setSaveBlueprintContent(content);
+    setIsSaveBlueprintOpen(true);
+  }, []);
+
   // Wire keyboard shortcuts
   useEditorShortcuts({
     onSave: handleShortcutSave,
@@ -544,27 +659,21 @@ function EditorInner({
     onDuplicate: handleDuplicate,
     onGroup: handleGroupNodes,
     onUngroup: handleUngroupNodes,
+    onSaveAsBlueprint: handleSaveAsBlueprint,
   });
 
   // Template browser state
   const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
 
   const handleApplyTemplate = useCallback(
-    (template: StoryboardTemplate) => {
+    (template: StoryboardTemplate, mode: "replace" | "append") => {
       pushSnapshot(nodesRef.current, edgesRef.current);
 
       const currentNodes = nodesRef.current;
 
-      // Calculate bounding box of existing nodes
-      let offsetX = 0;
-      if (currentNodes.length > 0) {
-        let maxX = -Infinity;
-        for (const node of currentNodes) {
-          const w = node.measured?.width ?? node.width ?? 180;
-          maxX = Math.max(maxX, node.position.x + w);
-        }
-        offsetX = maxX + 200;
-      }
+      // Calculate offset: append places template to the right; replace starts at 0
+      const offsetX =
+        mode === "append" ? calcTemplateAppendOffset(currentNodes) : 0;
 
       // Build ID mapping: old template ID -> new unique ID
       const idMap = new Map<string, string>();
@@ -600,19 +709,61 @@ function EditorInner({
         ...(tEdge.label ? { label: tEdge.label } : {}),
       }));
 
+      if (mode === "replace") {
+        // Clear existing nodes/edges and set to cloned template content
+        setNodes(() => {
+          setEdges(() => {
+            markDirtyAndSave(clonedNodes, clonedEdges);
+            return clonedEdges;
+          });
+          return clonedNodes;
+        });
+      } else {
+        // Append cloned nodes/edges to existing content
+        setNodes((nds) => {
+          const updated = [...nds, ...clonedNodes];
+          setEdges((eds) => {
+            const updatedEdges = [...eds, ...clonedEdges];
+            markDirtyAndSave(updated, updatedEdges);
+            return updatedEdges;
+          });
+          return updated;
+        });
+      }
+
+      setIsTemplateBrowserOpen(false);
+    },
+    [pushSnapshot, setNodes, setEdges, markDirtyAndSave],
+  );
+
+  // Blueprint insert handler
+  const handleBlueprintInsert = useCallback(
+    (content: { nodes: Node[]; edges: Edge[] }) => {
+      pushSnapshot(nodesRef.current, edgesRef.current);
+
+      const viewport = reactFlowInstance.getViewport();
+      const container = document.querySelector(".react-flow");
+      const width = container?.clientWidth ?? 800;
+      const height = container?.clientHeight ?? 600;
+      const centerX = (-viewport.x + width / 2) / viewport.zoom;
+      const centerY = (-viewport.y + height / 2) / viewport.zoom;
+
+      const { nodes: newNodes, edges: newEdges } = instantiateBlueprint(
+        content,
+        { x: centerX, y: centerY },
+      );
+
       setNodes((nds) => {
-        const updated = [...nds, ...clonedNodes];
+        const updated = [...nds, ...newNodes];
         setEdges((eds) => {
-          const updatedEdges = [...eds, ...clonedEdges];
+          const updatedEdges = [...eds, ...newEdges];
           markDirtyAndSave(updated, updatedEdges);
           return updatedEdges;
         });
         return updated;
       });
-
-      setIsTemplateBrowserOpen(false);
     },
-    [pushSnapshot, setNodes, setEdges, markDirtyAndSave],
+    [pushSnapshot, reactFlowInstance, setNodes, setEdges, markDirtyAndSave],
   );
 
   // Context menu state
@@ -621,15 +772,12 @@ function EditorInner({
     y: number;
   } | null>(null);
 
-  const handleContextMenu = useCallback(
-    (event: React.MouseEvent) => {
-      const selectedNodes = nodesRef.current.filter((n) => n.selected);
-      if (selectedNodes.length < 2) return;
-      event.preventDefault();
-      setContextMenu({ x: event.clientX, y: event.clientY });
-    },
-    [],
-  );
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    const selectedNodes = nodesRef.current.filter((n) => n.selected);
+    if (selectedNodes.length < 2) return;
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY });
+  }, []);
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null);
@@ -784,39 +932,31 @@ function EditorInner({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
-  // Save status display
-  const statusText = {
-    idle: "",
-    saving: "저장 중...",
-    saved: "저장됨",
-    error: "저장 실패",
-    conflict: "충돌 발생",
-  }[saveStatus];
-
-  const statusColor = {
-    idle: "text-muted-foreground",
-    saving: "text-muted-foreground",
-    saved: "text-green-600",
-    error: "text-destructive",
-    conflict: "text-orange-500",
-  }[saveStatus];
-
   return (
     <div className="flex h-full flex-col">
-      {/* Save status bar */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
-        <h1 className="truncate text-sm font-semibold text-foreground">
-          {storyboardName}
-        </h1>
-        {statusText && (
-          <span className={`text-xs ${statusColor}`}>{statusText}</span>
-        )}
-      </div>
+      {/* Editor header with undo/redo, save, layout */}
+      <EditorHeader
+        title={editorName}
+        hasSelectedNodes={hasSelectedNodes}
+        onUndo={handleShortcutUndo}
+        onRedo={handleShortcutRedo}
+        onSave={handleShortcutSave}
+        onSaveAsBlueprint={handleSaveAsBlueprint}
+        onBack={isBlueprint ? () => router.back() : undefined}
+        onTitleChange={handleTitleChange}
+        hideBlueprintSave={isBlueprint}
+      />
 
       {/* Main editor area */}
       {(() => {
         const nodeListEl = (
-          <NodeListPanel nodes={nodes} onNodeSelect={handleNodeSelect} />
+          <NodeListPanel
+            nodes={nodes}
+            onNodeSelect={handleNodeSelect}
+            onBlueprintInsert={isBlueprint ? undefined : handleBlueprintInsert}
+            orgSlug={orgSlug}
+            hideBlueprintTab={isBlueprint}
+          />
         );
         const propertyEl = (
           <PropertyPanel
@@ -826,8 +966,7 @@ function EditorInner({
           />
         );
 
-        const showNodeList =
-          layoutPreset !== "property-only" && isNodeListOpen;
+        const showNodeList = layoutPreset !== "property-only" && isNodeListOpen;
         const showProperty = isPropertyPanelOpen;
 
         // Determine left and right panel contents based on preset
@@ -854,7 +993,9 @@ function EditorInner({
           <div className="flex min-h-0 flex-1">
             {/* Left panel */}
             {leftPanel && (
-              <aside className={`shrink-0 overflow-hidden border-r ${layoutPreset === "reversed" ? "w-72" : "w-60"}`}>
+              <aside
+                className={`shrink-0 overflow-hidden border-r ${layoutPreset === "reversed" ? "w-72" : "w-60"}`}
+              >
                 {leftPanel}
               </aside>
             )}
@@ -865,8 +1006,14 @@ function EditorInner({
                 <button
                   type="button"
                   className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-md border bg-card p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-                  onClick={layoutPreset === "reversed" ? togglePropertyPanel : toggleNodeList}
-                  aria-label={layoutPreset === "reversed" ? "속성 열기" : "목록 열기"}
+                  onClick={
+                    layoutPreset === "reversed"
+                      ? togglePropertyPanel
+                      : toggleNodeList
+                  }
+                  aria-label={
+                    layoutPreset === "reversed" ? "속성 열기" : "목록 열기"
+                  }
                 >
                   <PanelLeftOpen className="h-4 w-4" />
                 </button>
@@ -891,6 +1038,7 @@ function EditorInner({
                     onDistribute={handleDistribute}
                     onGroup={handleGroupNodes}
                     onUngroup={handleUngroupNodes}
+                    onSaveAsBlueprint={handleSaveAsBlueprint}
                     onClose={handleCloseContextMenu}
                   />
                 )}
@@ -899,8 +1047,14 @@ function EditorInner({
                 <button
                   type="button"
                   className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-md border bg-card p-1.5 text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-                  onClick={layoutPreset === "reversed" ? toggleNodeList : togglePropertyPanel}
-                  aria-label={layoutPreset === "reversed" ? "목록 열기" : "속성 열기"}
+                  onClick={
+                    layoutPreset === "reversed"
+                      ? toggleNodeList
+                      : togglePropertyPanel
+                  }
+                  aria-label={
+                    layoutPreset === "reversed" ? "목록 열기" : "속성 열기"
+                  }
                 >
                   <PanelRightOpen className="h-4 w-4" />
                 </button>
@@ -909,7 +1063,9 @@ function EditorInner({
 
             {/* Right panel */}
             {rightPanel && (
-              <aside className={`shrink-0 overflow-hidden border-l ${layoutPreset === "reversed" ? "w-60" : "w-72"}`}>
+              <aside
+                className={`shrink-0 overflow-hidden border-l ${layoutPreset === "reversed" ? "w-60" : "w-72"}`}
+              >
                 {rightPanel}
               </aside>
             )}
@@ -928,6 +1084,15 @@ function EditorInner({
         open={isTemplateBrowserOpen}
         onClose={() => setIsTemplateBrowserOpen(false)}
         onApply={handleApplyTemplate}
+        currentNodeCount={nodes.length}
+        currentEdgeCount={edges.length}
+      />
+
+      {/* Save-as-blueprint dialog */}
+      <SaveBlueprintDialog
+        open={isSaveBlueprintOpen}
+        onOpenChange={setIsSaveBlueprintOpen}
+        content={saveBlueprintContent}
       />
     </div>
   );

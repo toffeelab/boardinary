@@ -50,13 +50,14 @@ export function useAutoSave({
   viewportRef,
   hasUnsavedChangesRef,
 }: UseAutoSaveOptions) {
-  const { setSaveStatus, contentVersion, setContentVersion } =
-    useEditorStore();
+  const { setSaveStatus, contentVersion, setContentVersion } = useEditorStore();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const performSave = useCallback(
     async (content: StoryboardContentV1, isRetry = false) => {
+      // Guard: blueprint mode passes empty IDs — this hook should not fire then
+      if (!storyboardId || !userId) return;
       setSaveStatus("saving");
       const result = await saveStoryboardAction(
         storyboardId,
@@ -88,7 +89,14 @@ export function useAutoSave({
       hasUnsavedChangesRef.current = false;
       setSaveStatus("saved");
     },
-    [storyboardId, userId, contentVersion, setSaveStatus, setContentVersion, hasUnsavedChangesRef],
+    [
+      storyboardId,
+      userId,
+      contentVersion,
+      setSaveStatus,
+      setContentVersion,
+      hasUnsavedChangesRef,
+    ],
   );
 
   const debouncedSave = useCallback(

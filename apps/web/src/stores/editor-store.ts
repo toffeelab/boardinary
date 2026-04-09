@@ -19,6 +19,7 @@ interface EditorState {
 
   // 레이아웃 (persist)
   layoutPreset: LayoutPreset;
+  leftPanelTab: "elements" | "blueprints";
 
   // Undo/Redo
   undoStack: HistoryEntry[];
@@ -31,6 +32,7 @@ interface EditorState {
   setSaveStatus: (status: EditorState["saveStatus"]) => void;
   setContentVersion: (version: number) => void;
   setLayoutPreset: (preset: LayoutPreset) => void;
+  setLeftPanelTab: (tab: "elements" | "blueprints") => void;
 
   // Undo/Redo 액션
   pushHistory: (entry: HistoryEntry) => void;
@@ -51,18 +53,19 @@ export const useEditorStore = create<EditorState>()(
       contentVersion: 0,
 
       layoutPreset: "default" as LayoutPreset,
+      leftPanelTab: "elements" as const,
 
       undoStack: [],
       redoStack: [],
 
-      toggleNodeList: () =>
-        set((s) => ({ isNodeListOpen: !s.isNodeListOpen })),
+      toggleNodeList: () => set((s) => ({ isNodeListOpen: !s.isNodeListOpen })),
       togglePropertyPanel: () =>
         set((s) => ({ isPropertyPanelOpen: !s.isPropertyPanelOpen })),
       setSelectedNodeId: (id) => set({ selectedNodeId: id }),
       setSaveStatus: (status) => set({ saveStatus: status }),
       setContentVersion: (version) => set({ contentVersion: version }),
       setLayoutPreset: (preset) => set({ layoutPreset: preset }),
+      setLeftPanelTab: (tab) => set({ leftPanelTab: tab }),
 
       pushHistory: (entry) =>
         set((s) => ({
@@ -100,6 +103,7 @@ export const useEditorStore = create<EditorState>()(
         isNodeListOpen: state.isNodeListOpen,
         isPropertyPanelOpen: state.isPropertyPanelOpen,
         layoutPreset: state.layoutPreset,
+        leftPanelTab: state.leftPanelTab,
       }),
     },
   ),

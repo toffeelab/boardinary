@@ -9,15 +9,14 @@ export default async function StoryboardDetailPage({
 }: {
   params: Promise<{ orgSlug: string; slug: string; id: string }>;
 }) {
-  const { id } = await params;
+  const { id, orgSlug } = await params;
   const userId = await getCurrentUserId();
 
   let storyboard: StoryboardDto;
   try {
-    storyboard = await apiClient<StoryboardDto>(
-      `/api/storyboards/${id}`,
-      { userId },
-    );
+    storyboard = await apiClient<StoryboardDto>(`/api/storyboards/${id}`, {
+      userId,
+    });
   } catch {
     notFound();
   }
@@ -30,6 +29,7 @@ export default async function StoryboardDetailPage({
         initialContent={storyboard.content}
         initialContentVersion={storyboard.contentVersion}
         storyboardName={storyboard.name}
+        orgSlug={orgSlug}
       />
     </div>
   );
