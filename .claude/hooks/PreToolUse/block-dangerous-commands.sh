@@ -6,7 +6,7 @@
 # === 설정 (init-harness.sh가 치환) ===
 # BLOCKED_PATTERNS 배열: 정규식. 프로젝트별 패턴을 여기에 추가.
 BLOCKED_PATTERNS=(
-  'git push.*(--force|-f|--force-with-lease)'
+  'git push.*(--force| -f\b|--force-with-lease)'
   'git push.*--delete'
   'git push [^ ]+ :'
   'git reset --hard'
