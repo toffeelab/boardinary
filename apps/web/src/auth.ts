@@ -10,10 +10,7 @@ import {
   verificationTokens,
 } from "@repo/db/auth";
 import authConfig from "./auth.config";
-import {
-  magicLinkEmailHtml,
-  magicLinkEmailText,
-} from "@/lib/magic-link-email";
+import { magicLinkEmailHtml, magicLinkEmailText } from "@/lib/magic-link-email";
 
 const API_URL = process.env.API_URL ?? "http://localhost:4001";
 const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET ?? "";
@@ -35,6 +32,12 @@ const nextAuth = NextAuth({
         // URL에서 토큰 추출 (다른 브라우저에서 수동 입력용)
         const urlObj = new URL(url);
         const token = urlObj.searchParams.get("token") ?? "";
+
+        // DEV ONLY: 토큰 URL을 파일에 저장 (테스트용)
+        if (process.env.NODE_ENV !== "production") {
+          const { writeFileSync } = await import("fs");
+          writeFileSync("/tmp/boardinary-dev-token.txt", url);
+        }
 
         const resend = new ResendClient(process.env.AUTH_RESEND_KEY!);
         await resend.emails.send({
