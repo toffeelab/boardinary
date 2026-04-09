@@ -28,6 +28,8 @@ import { useAutoSave } from "./hooks/use-auto-save";
 import { useBlueprintAutoSave } from "./hooks/use-blueprint-auto-save";
 import { useUndoRedo } from "./hooks/use-undo-redo";
 import { useEditorShortcuts } from "./hooks/use-editor-shortcuts";
+import { useCollaboration } from "@/hooks/use-collaboration";
+import { useCollaborationStore } from "@/stores/collaboration-slice";
 import { Canvas } from "./canvas";
 import { Toolbar } from "./panels/toolbar";
 import { NodeListPanel } from "./panels/node-list-panel";
@@ -256,7 +258,62 @@ function EditorInner(props: StoryboardEditorProps) {
   const { debouncedSave, immediateSave } = isBlueprint
     ? blueprintAutoSave
     : storyboardAutoSave;
-  const { pushSnapshot, undo, redo } = useUndoRedo();
+  const { pushSnapshot: _pushSnapshot, undo, redo } = useUndoRedo();
+
+  // isRemoteUpdate ref — 원격 변경 시 Undo 스택 오염 방지
+  const isRemoteUpdateRef = useRef(false);
+
+  const pushSnapshot = useCallback(
+    (nodes: Node[], edges: Edge[]) => {
+      if (isRemoteUpdateRef.current) return; // 원격 변경은 스킵
+      _pushSnapshot(nodes, edges);
+    },
+    [_pushSnapshot],
+  );
+
+  // useCollaboration 통합
+  const { emit: collabEmit, updatePresence } = useCollaboration({
+    storyboardId,
+    isRemoteUpdateRef,
+    onNodesUpdate: (remoteNodes) => {
+      setNodes(remoteNodes as Node[]);
+    },
+    onEdgesUpdate: (remoteEdges) => {
+      setEdges(remoteEdges as Edge[]);
+    },
+    onNodeRemote: (remoteNode, version) => {
+      void version;
+      setNodes((nds) => {
+        const exists = nds.find((n) => n.id === (remoteNode["id"] as string));
+        if (exists) {
+          return nds.map((n) =>
+            n.id === remoteNode["id"] ? { ...n, ...remoteNode } : n,
+          );
+        }
+        return [...nds, remoteNode as Node];
+      });
+    },
+    onNodeDeleteRemote: (nodeId, version) => {
+      void version;
+      setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+    },
+    onEdgeRemote: (remoteEdge, version) => {
+      void version;
+      setEdges((eds) => {
+        const exists = eds.find((e) => e.id === (remoteEdge["id"] as string));
+        if (exists) {
+          return eds.map((e) =>
+            e.id === remoteEdge["id"] ? { ...e, ...remoteEdge } : e,
+          );
+        }
+        return [...eds, remoteEdge as Edge];
+      });
+    },
+    onEdgeDeleteRemote: (edgeId, version) => {
+      void version;
+      setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+    },
+  });
 
   // Mark dirty and trigger debounced save
   const markDirtyAndSave = useCallback(
@@ -308,15 +365,17 @@ function EditorInner(props: StoryboardEditorProps) {
     (params: Connection) => {
       pushSnapshot(nodesRef.current, edgesRef.current);
       setEdges((eds) => {
-        const newEdges = addEdge(
-          { ...params, type: "labeled", label: "" },
-          eds,
-        );
+        const newEdge = { ...params, type: "labeled", label: "" };
+        const newEdges = addEdge(newEdge, eds);
         markDirtyAndSave(nodesRef.current, newEdges);
+        collabEmit("edge:add", {
+          storyboardId,
+          edge: newEdge as unknown as Record<string, unknown>,
+        });
         return newEdges;
       });
     },
-    [pushSnapshot, setEdges, markDirtyAndSave],
+    [pushSnapshot, setEdges, markDirtyAndSave, collabEmit, storyboardId],
   );
 
   // Selection change handler
@@ -340,9 +399,15 @@ function EditorInner(props: StoryboardEditorProps) {
       if (draggedNodes.length > 0) {
         pushSnapshot(nodesRef.current, edgesRef.current);
         markDirtyAndSave(nodesRef.current, edgesRef.current);
+        for (const node of draggedNodes) {
+          collabEmit("node:update", {
+            storyboardId,
+            node: { id: node.id, position: node.position },
+          });
+        }
       }
     },
-    [pushSnapshot, markDirtyAndSave],
+    [pushSnapshot, markDirtyAndSave, collabEmit, storyboardId],
   );
 
   // Move end — track viewport
@@ -389,6 +454,10 @@ function EditorInner(props: StoryboardEditorProps) {
         markDirtyAndSave(updated, edgesRef.current);
         return updated;
       });
+      collabEmit("node:add", {
+        storyboardId,
+        node: newNode as unknown as Record<string, unknown>,
+      });
 
       setSelectedNodeId(newNode.id);
     },
@@ -398,6 +467,8 @@ function EditorInner(props: StoryboardEditorProps) {
       reactFlowInstance,
       markDirtyAndSave,
       setSelectedNodeId,
+      collabEmit,
+      storyboardId,
     ],
   );
 
@@ -440,8 +511,12 @@ function EditorInner(props: StoryboardEditorProps) {
         markDirtyAndSave(updated, edgesRef.current);
         return updated;
       });
+      collabEmit("node:update", {
+        storyboardId,
+        node: { id: nodeId, data: data as unknown as Record<string, unknown> },
+      });
     },
-    [pushSnapshot, setNodes, markDirtyAndSave],
+    [pushSnapshot, setNodes, markDirtyAndSave, collabEmit, storyboardId],
   );
 
   // Node list panel — focus on node
@@ -661,6 +736,63 @@ function EditorInner(props: StoryboardEditorProps) {
     onUngroup: handleUngroupNodes,
     onSaveAsBlueprint: handleSaveAsBlueprint,
   });
+
+  // collab 커스텀 이벤트 구독
+  useEffect(() => {
+    function onUserJoined(e: Event) {
+      const { name } = (e as CustomEvent<{ name: string }>).detail;
+      void name; // 토스트 추가 시 활용
+    }
+    function onUserLeft(e: Event) {
+      const { name } = (e as CustomEvent<{ name: string }>).detail;
+      void name;
+    }
+    function onConflict(e: Event) {
+      const { nodeId } = (e as CustomEvent<{ nodeId: string }>).detail;
+      void nodeId;
+    }
+    window.addEventListener("collab:user-joined", onUserJoined);
+    window.addEventListener("collab:user-left", onUserLeft);
+    window.addEventListener("collab:conflict", onConflict);
+    return () => {
+      window.removeEventListener("collab:user-joined", onUserJoined);
+      window.removeEventListener("collab:user-left", onUserLeft);
+      window.removeEventListener("collab:conflict", onConflict);
+    };
+  }, []);
+
+  // presence 기반 nodeClassName
+  const presenceMap = useCollaborationStore((s) => s.presence);
+  const nodeClassName = useCallback(
+    (node: Node): string => {
+      for (const p of Object.values(presenceMap)) {
+        if (p.selectedNodeIds.includes(node.id)) {
+          return "ring-2";
+        }
+      }
+      return "";
+    },
+    [presenceMap],
+  );
+
+  // 마우스 이동 → presence 전송 (100ms throttle)
+  const lastPresenceSendRef = useRef(0);
+  const handleCanvasMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const now = Date.now();
+      if (now - lastPresenceSendRef.current < 100) return;
+      lastPresenceSendRef.current = now;
+      const flowPos = reactFlowInstance.screenToFlowPosition({
+        x: e.clientX,
+        y: e.clientY,
+      });
+      const selectedIds = nodesRef.current
+        .filter((n) => n.selected)
+        .map((n) => n.id);
+      updatePresence(flowPos, selectedIds);
+    },
+    [reactFlowInstance, updatePresence],
+  );
 
   // Template browser state
   const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
@@ -1018,7 +1150,11 @@ function EditorInner(props: StoryboardEditorProps) {
                   <PanelLeftOpen className="h-4 w-4" />
                 </button>
               )}
-              <div className="h-full w-full" onContextMenu={handleContextMenu}>
+              <div
+                className="h-full w-full"
+                onContextMenu={handleContextMenu}
+                onMouseMove={handleCanvasMouseMove}
+              >
                 <Canvas
                   nodes={nodes}
                   edges={edges}
@@ -1029,6 +1165,7 @@ function EditorInner(props: StoryboardEditorProps) {
                   onNodeDragStop={handleNodeDragStop}
                   onMoveEnd={handleMoveEnd}
                   onNodeDrop={handleNodeDrop}
+                  nodeClassName={nodeClassName}
                 />
                 {contextMenu && (
                   <ContextMenu
