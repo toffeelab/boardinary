@@ -71,8 +71,10 @@ export function BlueprintPanel({
           edges: Edge[];
         };
         onInsert(content);
-      } catch {
-        setError("블루프린트를 삽입할 수 없습니다.");
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "알 수 없는 오류";
+        setError(`블루프린트를 삽입할 수 없습니다: ${message}`);
       }
     },
     [onInsert],

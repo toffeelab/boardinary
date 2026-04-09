@@ -94,8 +94,10 @@ export function SaveBlueprintDialog({
         setError(null);
         onOpenChange(false);
         onSaved?.();
-      } catch {
-        setError("저장에 실패했습니다. 다시 시도해주세요.");
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "알 수 없는 오류";
+        setError(`저장에 실패했습니다: ${message}`);
       }
     });
   }

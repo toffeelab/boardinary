@@ -39,37 +39,28 @@ function ConditionNodeComponent({ data, selected }: NodeProps) {
         </p>
       )}
       <div className="mt-2 space-y-1">
-        <div className="relative flex items-center">
+        <div className="flex items-center">
           <span className="text-xs text-green-600 font-medium">True</span>
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="true"
-            className="bg-green-500! w-2.5! h-2.5!"
-            style={{
-              position: "absolute",
-              right: -20,
-              top: "50%",
-              transform: "translateY(-50%)",
-            }}
-          />
         </div>
-        <div className="relative flex items-center">
+        <div className="flex items-center">
           <span className="text-xs text-red-600 font-medium">False</span>
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="false"
-            className="bg-red-500! w-2.5! h-2.5!"
-            style={{
-              position: "absolute",
-              right: -20,
-              top: "50%",
-              transform: "translateY(-50%)",
-            }}
-          />
         </div>
       </div>
+      {/* Handles positioned via `top` only — React Flow manages border placement */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="true"
+        className="bg-green-500! w-2.5! h-2.5!"
+        style={{ top: "62%" }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="false"
+        className="bg-red-500! w-2.5! h-2.5!"
+        style={{ top: "80%" }}
+      />
     </div>
   );
 }
