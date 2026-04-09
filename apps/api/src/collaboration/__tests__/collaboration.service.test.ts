@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CollaborationService } from "../collaboration.service";
 import type { CollaborationRedisService } from "../collaboration-redis.service";
 
-const mockRedis: Partial<CollaborationRedisService> = {
+const mockRedis = {
   setNode: vi.fn().mockResolvedValue(undefined),
   deleteNode: vi.fn().mockResolvedValue(undefined),
   getAllNodes: vi.fn().mockResolvedValue([]),
@@ -48,7 +48,7 @@ describe("CollaborationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = new CollaborationService(
-      mockRedis as CollaborationRedisService,
+      mockRedis as unknown as CollaborationRedisService,
       mockStoryboardsService as never,
     );
   });
