@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # warn-main-branch-edit.sh — 보호 브랜치에서 코드 수정 차단
 # 트리거: PreToolUse (matcher: Edit|Write)
 # 보안 모드: fail-closed (기본)

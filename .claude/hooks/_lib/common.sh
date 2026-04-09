@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # .claude/hooks/_lib/common.sh — 모든 hook이 source하는 공유 유틸
 # 보안 원칙: PreToolUse = fail-closed, PostToolUse = HOOK_FAIL_OPEN=1로 fail-open
 

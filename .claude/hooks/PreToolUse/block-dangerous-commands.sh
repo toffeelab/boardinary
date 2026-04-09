@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # block-dangerous-commands.sh — 위험한 명령어 차단
 # 트리거: PreToolUse (matcher: Bash)
 # 보안 모드: fail-closed (기본)
