@@ -61,6 +61,18 @@ export class CollaborationRedisService {
     return v ? parseInt(v, 10) : 0;
   }
 
+  async setVersion(storyboardId: string, version: number): Promise<void> {
+    await this.redis.set(`storyboard:${storyboardId}:version`, version);
+  }
+
+  async clearRoom(storyboardId: string): Promise<void> {
+    await this.redis.del(
+      `storyboard:${storyboardId}:nodes`,
+      `storyboard:${storyboardId}:edges`,
+      `storyboard:${storyboardId}:version`,
+    );
+  }
+
   // --- Conflict detection ---
   async setLastWriter(
     storyboardId: string,

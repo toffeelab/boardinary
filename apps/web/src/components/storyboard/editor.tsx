@@ -245,6 +245,11 @@ function EditorInner(props: StoryboardEditorProps) {
   // Track whether any nodes are selected (for blueprint save)
   const [hasSelectedNodes, setHasSelectedNodes] = useState(false);
 
+  // 충돌 감지된 노드 IDs (3초간 빨간 테두리 표시)
+  const [conflictNodeIds, setConflictNodeIds] = useState<Set<string>>(
+    new Set(),
+  );
+
   // Hooks — auto-save differs based on mode
   const storyboardAutoSave = useAutoSave({
     storyboardId,
@@ -750,7 +755,14 @@ function EditorInner(props: StoryboardEditorProps) {
     }
     function onConflict(e: Event) {
       const { nodeId } = (e as CustomEvent<{ nodeId: string }>).detail;
-      void nodeId;
+      setConflictNodeIds((prev) => new Set([...prev, nodeId]));
+      setTimeout(() => {
+        setConflictNodeIds((prev) => {
+          const next = new Set(prev);
+          next.delete(nodeId);
+          return next;
+        });
+      }, 3000);
     }
     window.addEventListener("collab:user-joined", onUserJoined);
     window.addEventListener("collab:user-left", onUserLeft);
@@ -766,6 +778,7 @@ function EditorInner(props: StoryboardEditorProps) {
   const presenceMap = useCollaborationStore((s) => s.presence);
   const nodeClassName = useCallback(
     (node: Node): string => {
+      if (conflictNodeIds.has(node.id)) return "ring-2 ring-red-500";
       for (const p of Object.values(presenceMap)) {
         if (p.selectedNodeIds.includes(node.id)) {
           return "ring-2";
@@ -773,7 +786,7 @@ function EditorInner(props: StoryboardEditorProps) {
       }
       return "";
     },
-    [presenceMap],
+    [presenceMap, conflictNodeIds],
   );
 
   // 마우스 이동 → presence 전송 (100ms throttle)

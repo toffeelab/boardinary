@@ -84,11 +84,17 @@ export class CollaborationService {
 
   /** 초기 룸 진입 시 DB에서 Redis로 상태 로드 */
   async initRoomFromDb(storyboardId: string): Promise<number> {
-    const existing = await this.redis.getVersion(storyboardId);
-    if (existing > 0) return existing;
-
     const storyboard =
       await this.storyboardsService.getStoryboardById(storyboardId);
+    const dbVersion = storyboard.contentVersion;
+    const redisVersion = await this.redis.getVersion(storyboardId);
+
+    // Redis가 DB와 동기화된 상태면 그대로 사용
+    if (redisVersion > 0 && redisVersion >= dbVersion) return redisVersion;
+
+    // Redis가 낡았거나 비어있으면 DB에서 재로드
+    await this.redis.clearRoom(storyboardId);
+
     const content = storyboard.content as {
       nodes?: Array<{ id: string }>;
       edges?: Array<{ id: string }>;
@@ -101,12 +107,8 @@ export class CollaborationService {
       await this.redis.setEdge(storyboardId, edge.id, edge);
     }
 
-    const version = storyboard.contentVersion;
-    // version을 Redis에 초기화
-    for (let i = 0; i < version; i++) {
-      await this.redis.incrementVersion(storyboardId);
-    }
-    return version;
+    await this.redis.setVersion(storyboardId, dbVersion);
+    return dbVersion;
   }
 
   /** 노드 업데이트 — conflict 감지 포함 */
