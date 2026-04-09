@@ -8,5 +8,6 @@ import { OrganizationsModule } from "../organizations/organizations.module";
   imports: [ProjectsModule, OrganizationsModule],
   controllers: [StoryboardsController],
   providers: [StoryboardsService],
+  exports: [StoryboardsService],
 })
 export class StoryboardsModule {}

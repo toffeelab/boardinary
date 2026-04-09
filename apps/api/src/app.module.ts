@@ -1,7 +1,9 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { EventEmitterModule } from "@nestjs/event-emitter";
 import { AuthModule } from "./auth/auth.module";
 import { BlueprintsModule } from "./blueprints/blueprints.module";
+import { CollaborationModule } from "./collaboration/collaboration.module";
 import { HealthController } from "./health.controller";
 import { OrganizationsModule } from "./organizations/organizations.module";
 import { ProjectsModule } from "./projects/projects.module";
@@ -14,12 +16,14 @@ import { UsersModule } from "./users/users.module";
       isGlobal: true,
       envFilePath: [".env", ".env.local"],
     }),
+    EventEmitterModule.forRoot(),
     AuthModule,
     UsersModule,
     OrganizationsModule,
     ProjectsModule,
     StoryboardsModule,
     BlueprintsModule,
+    CollaborationModule,
   ],
   controllers: [HealthController],
 })
