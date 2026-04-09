@@ -27,11 +27,7 @@ interface CanvasProps {
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
   onSelectionChange: (params: { nodes: Node[] }) => void;
-  onNodeDragStop: (
-    event: React.MouseEvent,
-    node: Node,
-    nodes: Node[],
-  ) => void;
+  onNodeDragStop: (event: React.MouseEvent, node: Node, nodes: Node[]) => void;
   onMoveEnd: (
     event: MouseEvent | TouchEvent | null,
     viewport: Viewport,
@@ -40,6 +36,7 @@ interface CanvasProps {
     type: "scene" | "event" | "branch" | "dialogue" | "condition" | "note",
     position: { x: number; y: number },
   ) => void;
+  nodeClassName?: (node: Node) => string;
 }
 
 export function Canvas({
@@ -52,6 +49,7 @@ export function Canvas({
   onNodeDragStop,
   onMoveEnd,
   onNodeDrop,
+  nodeClassName,
 }: CanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const { isValidConnection } = useEdgeValidation(edges);
@@ -73,7 +71,13 @@ export function Canvas({
       });
 
       onNodeDrop?.(
-        type as "scene" | "event" | "branch" | "dialogue" | "condition" | "note",
+        type as
+          | "scene"
+          | "event"
+          | "branch"
+          | "dialogue"
+          | "condition"
+          | "note",
         position,
       );
     },
@@ -83,7 +87,14 @@ export function Canvas({
   return (
     <div className="h-full w-full">
       <ReactFlow
-        nodes={nodes}
+        nodes={
+          nodeClassName
+            ? nodes.map((n) => ({
+                ...n,
+                className: nodeClassName(n) || n.className,
+              }))
+            : nodes
+        }
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}

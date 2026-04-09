@@ -17,6 +17,9 @@ export class InternalAuthGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
+    // WS 컨텍스트는 WsAuthGuard가 처리 — 전역 HTTP Guard 스킵
+    if (context.getType() === "ws") return true;
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -30,8 +33,9 @@ export class InternalAuthGuard implements CanActivate {
     const secret = Array.isArray(rawSecret) ? rawSecret[0] : rawSecret;
     const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
 
-    const expectedSecret =
-      this.configService.get<string>("INTERNAL_API_SECRET");
+    const expectedSecret = this.configService.get<string>(
+      "INTERNAL_API_SECRET",
+    );
 
     if (!secret || secret !== expectedSecret) {
       throw new UnauthorizedException("Invalid internal secret");
