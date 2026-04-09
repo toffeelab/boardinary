@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import Redis from "ioredis";
 import { CollaborationGateway } from "./collaboration.gateway";
 import { CollaborationService } from "./collaboration.service";
@@ -8,7 +9,7 @@ import { WsAuthGuard } from "./guards/ws-auth.guard";
 import { StoryboardsModule } from "../storyboards/storyboards.module";
 
 @Module({
-  imports: [ConfigModule, StoryboardsModule],
+  imports: [ConfigModule, StoryboardsModule, ScheduleModule.forRoot()],
   providers: [
     {
       provide: "REDIS_CLIENT",

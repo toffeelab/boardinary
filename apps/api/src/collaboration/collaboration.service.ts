@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { Cron } from "@nestjs/schedule";
 import { CollaborationRedisService } from "./collaboration-redis.service";
 import { StoryboardsService } from "../storyboards/storyboards.service";
 import type { RoomStatePayload, UserPresence } from "@repo/types";
@@ -192,6 +193,11 @@ export class CollaborationService {
     await Promise.all(
       ids.map((id) => this.flushStoryboard(id).catch(() => undefined)),
     );
+  }
+
+  @Cron("*/30 * * * * *") // 30초마다
+  async scheduledFlush(): Promise<void> {
+    await this.flushAllDirtyRooms();
   }
 
   async onUserLeave(
