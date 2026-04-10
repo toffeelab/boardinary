@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "idx_sv_auto_retention" ON "storyboard_versions" USING btree ("storyboard_id","created_at") WHERE "label" IS NULL;

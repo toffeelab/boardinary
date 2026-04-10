@@ -7,6 +7,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { storyboards } from "./schema";
 import { users } from "./schema";
@@ -36,5 +37,8 @@ export const storyboardVersions = pgTable(
       table.contentVersion,
     ),
     index("idx_sv_list").on(table.storyboardId, table.createdAt),
+    index("idx_sv_auto_retention")
+      .on(table.storyboardId, table.createdAt)
+      .where(sql`"label" IS NULL`),
   ],
 );

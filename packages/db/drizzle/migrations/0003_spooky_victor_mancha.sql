@@ -14,6 +14,3 @@ ALTER TABLE "storyboard_versions" ADD CONSTRAINT "storyboard_versions_storyboard
 ALTER TABLE "storyboard_versions" ADD CONSTRAINT "storyboard_versions_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "uq_sv_content_version" ON "storyboard_versions" USING btree ("storyboard_id","content_version");--> statement-breakpoint
 CREATE INDEX "idx_sv_list" ON "storyboard_versions" USING btree ("storyboard_id","created_at");
-CREATE INDEX IF NOT EXISTS "idx_sv_auto_retention"
-ON "storyboard_versions" ("storyboard_id", "created_at" ASC)
-WHERE "label" IS NULL;
