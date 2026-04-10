@@ -4,6 +4,7 @@ import { EventEmitterModule } from "@nestjs/event-emitter";
 import { AuthModule } from "./auth/auth.module";
 import { BlueprintsModule } from "./blueprints/blueprints.module";
 import { CollaborationModule } from "./collaboration/collaboration.module";
+import { VersionsModule } from "./versions/versions.module";
 import { HealthController } from "./health.controller";
 import { OrganizationsModule } from "./organizations/organizations.module";
 import { ProjectsModule } from "./projects/projects.module";
@@ -24,6 +25,7 @@ import { UsersModule } from "./users/users.module";
     StoryboardsModule,
     BlueprintsModule,
     CollaborationModule,
+    VersionsModule,
   ],
   controllers: [HealthController],
 })

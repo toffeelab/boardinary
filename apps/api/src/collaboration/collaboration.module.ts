@@ -26,5 +26,6 @@ import { StoryboardsModule } from "../storyboards/storyboards.module";
     CollaborationGateway,
     WsAuthGuard,
   ],
+  exports: [CollaborationService],
 })
 export class CollaborationModule {}
