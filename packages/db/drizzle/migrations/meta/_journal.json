@@ -22,6 +22,13 @@
       "when": 1774892166189,
       "tag": "0002_breezy_triton",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775822746856,
+      "tag": "0003_useful_lilith",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,9 @@ interface UseEditorShortcutsOptions {
   onGroup?: () => void;
   onUngroup?: () => void;
   onSaveAsBlueprint?: () => void;
+  onToggleCommentMode?: () => void;
+  onExitCommentMode?: () => void;
+  isCommentMode?: boolean;
 }
 
 export function useEditorShortcuts({
@@ -20,10 +23,32 @@ export function useEditorShortcuts({
   onGroup,
   onUngroup,
   onSaveAsBlueprint,
+  onToggleCommentMode,
+  onExitCommentMode,
+  isCommentMode,
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
+
+      // C 키: 주석 모드 토글 (Ctrl/Cmd 없이)
+      if (!mod && !e.shiftKey && e.key.toLowerCase() === "c") {
+        if (
+          document.activeElement?.tagName === "INPUT" ||
+          document.activeElement?.tagName === "TEXTAREA"
+        )
+          return;
+        e.preventDefault();
+        onToggleCommentMode?.();
+        return;
+      }
+
+      // Escape: 주석 모드 종료 (only when in comment mode)
+      if (e.key === "Escape" && isCommentMode) {
+        onExitCommentMode?.();
+        return;
+      }
+
       if (!mod) return;
 
       // Ctrl+Shift+S: save as blueprint (must be checked before regular Ctrl+S)
@@ -77,5 +102,8 @@ export function useEditorShortcuts({
     onGroup,
     onUngroup,
     onSaveAsBlueprint,
+    onToggleCommentMode,
+    onExitCommentMode,
+    isCommentMode,
   ]);
 }
