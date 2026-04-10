@@ -774,6 +774,7 @@ function EditorInner(props: StoryboardEditorProps) {
     onSaveAsBlueprint: handleSaveAsBlueprint,
     onToggleCommentMode: () => setCommentMode(!isCommentMode),
     onExitCommentMode: () => setCommentMode(false),
+    isCommentMode,
   });
 
   // collab 커스텀 이벤트 구독

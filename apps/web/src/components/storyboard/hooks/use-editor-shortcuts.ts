@@ -12,6 +12,7 @@ interface UseEditorShortcutsOptions {
   onSaveAsBlueprint?: () => void;
   onToggleCommentMode?: () => void;
   onExitCommentMode?: () => void;
+  isCommentMode?: boolean;
 }
 
 export function useEditorShortcuts({
@@ -24,6 +25,7 @@ export function useEditorShortcuts({
   onSaveAsBlueprint,
   onToggleCommentMode,
   onExitCommentMode,
+  isCommentMode,
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -41,8 +43,8 @@ export function useEditorShortcuts({
         return;
       }
 
-      // Escape: 주석 모드 종료
-      if (e.key === "Escape") {
+      // Escape: 주석 모드 종료 (only when in comment mode)
+      if (e.key === "Escape" && isCommentMode) {
         onExitCommentMode?.();
         return;
       }
@@ -102,5 +104,6 @@ export function useEditorShortcuts({
     onSaveAsBlueprint,
     onToggleCommentMode,
     onExitCommentMode,
+    isCommentMode,
   ]);
 }
