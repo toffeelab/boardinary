@@ -10,6 +10,7 @@ interface UseEditorShortcutsOptions {
   onGroup?: () => void;
   onUngroup?: () => void;
   onSaveAsBlueprint?: () => void;
+  toggleHistory?: () => void;
 }
 
 export function useEditorShortcuts({
@@ -20,9 +21,27 @@ export function useEditorShortcuts({
   onGroup,
   onUngroup,
   onSaveAsBlueprint,
+  toggleHistory,
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Block shortcuts when typing in an input/textarea/contenteditable
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      // H key — toggle version history panel (no modifier)
+      if ((e.key === "h" || e.key === "H") && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        toggleHistory?.();
+        return;
+      }
+
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
 
@@ -77,5 +96,6 @@ export function useEditorShortcuts({
     onGroup,
     onUngroup,
     onSaveAsBlueprint,
+    toggleHistory,
   ]);
 }

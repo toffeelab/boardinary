@@ -301,5 +301,5 @@ export function useCollaboration({
     [],
   );
 
-  return { emit, updatePresence };
+  return { emit, updatePresence, socketRef };
 }

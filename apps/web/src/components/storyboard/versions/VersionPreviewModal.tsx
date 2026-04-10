@@ -52,7 +52,7 @@ export function VersionPreviewModal({
             id: n.id,
             type: n.type,
             position: n.position,
-            data: n.data,
+            data: n.data as unknown as Record<string, unknown>,
           })),
         );
         setEdges(
