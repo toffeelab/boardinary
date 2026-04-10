@@ -44,7 +44,6 @@ async function createTestStoryboard(userId: string) {
     .insert(projects)
     .values({
       orgId: org!.id,
-      createdBy: userId,
       name: "Test Project",
       slug: `test-project-${Date.now()}`,
     })
