@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { CollaborationRedisService } from "./collaboration-redis.service";
 import { StoryboardsService } from "../storyboards/storyboards.service";
+import { VersionsService } from "../versions/versions.service";
 import type { RoomStatePayload, UserPresence } from "@repo/types";
 
 const PRESENCE_COLORS = [
@@ -22,6 +23,7 @@ export class CollaborationService {
   constructor(
     private readonly redis: CollaborationRedisService,
     private readonly storyboardsService: StoryboardsService,
+    private readonly versionsService: VersionsService,
   ) {}
 
   /** 룸 입장 시 색상 배정 */
@@ -192,6 +194,22 @@ export class CollaborationService {
     });
 
     await this.redis.clearDirty(storyboardId);
+
+    // 10번째 버전마다 자동 스냅샷 생성
+    if (version > 0 && version % 10 === 0) {
+      try {
+        await this.versionsService.createSnapshot(
+          storyboardId,
+          content as Record<string, unknown>,
+          version - 1,
+          null,
+          "system",
+        );
+        await this.versionsService.pruneAutoVersions(storyboardId);
+      } catch {
+        // 스냅샷 실패가 flush를 막으면 안 됨
+      }
+    }
   }
 
   async flushAllDirtyRooms(): Promise<void> {

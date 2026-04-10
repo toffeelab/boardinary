@@ -7,9 +7,15 @@ import { CollaborationService } from "./collaboration.service";
 import { CollaborationRedisService } from "./collaboration-redis.service";
 import { WsAuthGuard } from "./guards/ws-auth.guard";
 import { StoryboardsModule } from "../storyboards/storyboards.module";
+import { VersionsModule } from "../versions/versions.module";
 
 @Module({
-  imports: [ConfigModule, StoryboardsModule, ScheduleModule.forRoot()],
+  imports: [
+    ConfigModule,
+    StoryboardsModule,
+    VersionsModule,
+    ScheduleModule.forRoot(),
+  ],
   providers: [
     {
       provide: "REDIS_CLIENT",
