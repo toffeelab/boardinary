@@ -3,7 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { db, comments, commentReplies, users } from "@repo/db";
 import type { Server } from "socket.io";
 import type {
@@ -70,53 +70,62 @@ export class CommentsService {
   }
 
   async getCommentsByStoryboard(storyboardId: string): Promise<CommentDto[]> {
-    const rows = await db
-      .select()
+    // Query 1: comments + authors in one leftJoin
+    const commentRows = await db
+      .select({
+        comment: comments,
+        authorId: users.id,
+        authorName: users.name,
+        authorImage: users.image,
+      })
       .from(comments)
+      .leftJoin(users, eq(comments.authorId, users.id))
       .where(eq(comments.storyboardId, storyboardId))
       .orderBy(desc(comments.createdAt));
 
-    const result: CommentDto[] = [];
-    for (const row of rows) {
-      const [authorRow] = await db
-        .select({ id: users.id, name: users.name, image: users.image })
-        .from(users)
-        .where(eq(users.id, row.authorId))
-        .limit(1);
-      const author = this.formatAuthor(
-        authorRow ?? { id: row.authorId, name: null, image: null },
-      );
+    if (commentRows.length === 0) return [];
 
-      const replyRows = await db
-        .select()
-        .from(commentReplies)
-        .where(eq(commentReplies.commentId, row.id))
-        .orderBy(commentReplies.createdAt);
+    const commentIds = commentRows.map((r) => r.comment.id);
 
-      const replies: CommentReplyDto[] = [];
-      for (const reply of replyRows) {
-        const [replyAuthorRow] = await db
-          .select({ id: users.id, name: users.name, image: users.image })
-          .from(users)
-          .where(eq(users.id, reply.authorId))
-          .limit(1);
-        replies.push(
-          this.formatReply(
-            reply,
-            this.formatAuthor(
-              replyAuthorRow ?? {
-                id: reply.authorId,
-                name: null,
-                image: null,
-              },
-            ),
-          ),
-        );
-      }
+    // Query 2: all replies + authors in one leftJoin
+    const replyRows = await db
+      .select({
+        reply: commentReplies,
+        authorId: users.id,
+        authorName: users.name,
+        authorImage: users.image,
+      })
+      .from(commentReplies)
+      .leftJoin(users, eq(commentReplies.authorId, users.id))
+      .where(inArray(commentReplies.commentId, commentIds))
+      .orderBy(commentReplies.createdAt);
 
-      result.push(this.formatComment(row, author, replies));
+    // Group replies by commentId
+    const repliesByCommentId = new Map<string, CommentReplyDto[]>();
+    for (const r of replyRows) {
+      const author = this.formatAuthor({
+        id: r.authorId ?? r.reply.authorId,
+        name: r.authorName ?? null,
+        image: r.authorImage ?? null,
+      });
+      const reply = this.formatReply(r.reply, author);
+      const existing = repliesByCommentId.get(r.reply.commentId) ?? [];
+      existing.push(reply);
+      repliesByCommentId.set(r.reply.commentId, existing);
     }
-    return result;
+
+    return commentRows.map((r) => {
+      const author = this.formatAuthor({
+        id: r.authorId ?? r.comment.authorId,
+        name: r.authorName ?? null,
+        image: r.authorImage ?? null,
+      });
+      return this.formatComment(
+        r.comment,
+        author,
+        repliesByCommentId.get(r.comment.id) ?? [],
+      );
+    });
   }
 
   async createComment(

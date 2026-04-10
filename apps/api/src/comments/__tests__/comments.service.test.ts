@@ -6,6 +6,7 @@ vi.mock("drizzle-orm", () => ({
   eq: (col: unknown, val: unknown) => ({ col, val, op: "eq" }),
   and: (...conditions: unknown[]) => ({ conditions, op: "and" }),
   desc: (col: unknown) => ({ col, op: "desc" }),
+  inArray: (col: unknown, vals: unknown) => ({ col, vals, op: "inArray" }),
 }));
 
 const mockSelect = vi.fn();
@@ -89,30 +90,40 @@ describe("CommentsService", () => {
 
   describe("getCommentsByStoryboard", () => {
     it("주석 목록을 storyboardId로 조회한다", async () => {
-      const mockComments = [
+      const now = new Date();
+      const mockCommentRows = [
         {
-          id: "c1",
-          storyboardId: "sb1",
-          content: "test",
-          anchorType: "node",
-          anchorNodeId: "n1",
-          canvasX: null,
-          canvasY: null,
-          status: "open",
+          comment: {
+            id: "c1",
+            storyboardId: "sb1",
+            content: "test",
+            anchorType: "node",
+            anchorNodeId: "n1",
+            canvasX: null,
+            canvasY: null,
+            status: "open",
+            authorId: "u1",
+            resolvedBy: null,
+            resolvedAt: null,
+            createdAt: now,
+            updatedAt: now,
+          },
           authorId: "u1",
           authorName: "김기획",
           authorImage: null,
-          resolvedBy: null,
-          resolvedAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
         },
       ];
-      mockSelect.mockReturnValue(createSelectChain(mockComments));
+
+      // Query 1: comments + authors
+      mockSelect.mockReturnValueOnce(createSelectChain(mockCommentRows));
+      // Query 2: replies + authors (empty)
+      mockSelect.mockReturnValueOnce(createSelectChain([]));
 
       const result = await service.getCommentsByStoryboard("sb1");
       expect(result).toHaveLength(1);
       expect(result[0]!.id).toBe("c1");
+      expect(result[0]!.author.name).toBe("김기획");
+      expect(result[0]!.replies).toHaveLength(0);
     });
   });
 
