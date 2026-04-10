@@ -5,12 +5,14 @@ import {
   MessageBody,
   ConnectedSocket,
   OnGatewayDisconnect,
+  OnGatewayInit,
 } from "@nestjs/websockets";
 import { UseGuards, UsePipes, ValidationPipe } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { OnEvent } from "@nestjs/event-emitter";
 import { WsAuthGuard } from "./guards/ws-auth.guard";
 import { CollaborationService } from "./collaboration.service";
+import { CommentsService } from "../comments/comments.service";
 import { JoinRoomDto } from "./dto/join-room.dto";
 import { SyncEventDto } from "./dto/sync-event.dto";
 import { NodeEventDto } from "./dto/node-event.dto";
@@ -29,14 +31,23 @@ import type { UserPresence, Operation } from "@repo/types";
 })
 @UseGuards(WsAuthGuard)
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-export class CollaborationGateway implements OnGatewayDisconnect {
+export class CollaborationGateway
+  implements OnGatewayDisconnect, OnGatewayInit
+{
   @WebSocketServer()
   server!: Server;
 
   // socketId → storyboardId (단일 룸 가정)
   private readonly socketRoom = new Map<string, string>();
 
-  constructor(private readonly collaborationService: CollaborationService) {}
+  constructor(
+    private readonly collaborationService: CollaborationService,
+    private readonly commentsService: CommentsService,
+  ) {}
+
+  afterInit(server: Server) {
+    this.commentsService.setServer(server);
+  }
 
   @SubscribeMessage("room:join")
   async handleJoin(
