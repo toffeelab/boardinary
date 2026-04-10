@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type StoryboardNodeType =
@@ -14,6 +14,8 @@ type StoryboardNodeType =
 interface ToolbarProps {
   onAddNode: (type: StoryboardNodeType) => void;
   onOpenTemplates?: () => void;
+  isCommentMode?: boolean;
+  onToggleCommentMode?: () => void;
 }
 
 const ADD_BUTTONS: {
@@ -29,7 +31,12 @@ const ADD_BUTTONS: {
   { type: "note", label: "+ 메모", color: "#6b7280" },
 ];
 
-export function Toolbar({ onAddNode, onOpenTemplates }: ToolbarProps) {
+export function Toolbar({
+  onAddNode,
+  onOpenTemplates,
+  isCommentMode,
+  onToggleCommentMode,
+}: ToolbarProps) {
   return (
     <div className="flex items-center justify-center gap-2 border-t border-border bg-card px-4 py-2">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -68,6 +75,23 @@ export function Toolbar({ onAddNode, onOpenTemplates }: ToolbarProps) {
           >
             <ClipboardList className="h-4 w-4" />
             템플릿
+          </Button>
+        </>
+      )}
+
+      {onToggleCommentMode && (
+        <>
+          <div className="mx-1 h-5 w-px bg-border" />
+          <Button
+            type="button"
+            variant={isCommentMode ? "default" : "outline"}
+            size="sm"
+            onClick={onToggleCommentMode}
+            className="gap-1.5"
+            title="주석 모드 (C)"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            주석
           </Button>
         </>
       )}
