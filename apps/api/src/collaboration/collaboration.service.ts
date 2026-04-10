@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Inject, forwardRef } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { CollaborationRedisService } from "./collaboration-redis.service";
 import { StoryboardsService } from "../storyboards/storyboards.service";
@@ -23,6 +23,7 @@ export class CollaborationService {
   constructor(
     private readonly redis: CollaborationRedisService,
     private readonly storyboardsService: StoryboardsService,
+    @Inject(forwardRef(() => VersionsService))
     private readonly versionsService: VersionsService,
   ) {}
 

@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import Redis from "ioredis";
@@ -13,7 +13,7 @@ import { VersionsModule } from "../versions/versions.module";
   imports: [
     ConfigModule,
     StoryboardsModule,
-    VersionsModule,
+    forwardRef(() => VersionsModule),
     ScheduleModule.forRoot(),
   ],
   providers: [

@@ -7,6 +7,8 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  Inject,
+  forwardRef,
 } from "@nestjs/common";
 import { CurrentUserId } from "../auth/current-user.decorator";
 import { VersionsService } from "./versions.service";
@@ -21,6 +23,7 @@ export class VersionsController {
   constructor(
     private readonly versionsService: VersionsService,
     private readonly storyboardsService: StoryboardsService,
+    @Inject(forwardRef(() => CollaborationService))
     private readonly collaborationService: CollaborationService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
