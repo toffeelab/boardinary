@@ -4,7 +4,7 @@ import {
   UnprocessableEntityException,
 } from "@nestjs/common";
 import { db, storyboardVersions, storyboards } from "@repo/db";
-import { eq, and, isNull, sql, desc, asc } from "drizzle-orm";
+import { eq, and, isNull, sql, desc, asc, inArray } from "drizzle-orm";
 import type { VersionMetadata } from "@repo/types";
 
 const MAX_AUTO_VERSIONS = 50;
@@ -48,11 +48,23 @@ export class VersionsService {
             ),
           )
           .limit(1);
-        return existing!;
+        if (!existing) {
+          throw new UnprocessableEntityException(
+            "Concurrent version conflict; please retry",
+          );
+        }
+        return existing;
       }
 
       return version;
-    } catch {
+    } catch (error: unknown) {
+      // unique constraint violation (PostgreSQL error code 23505)만 처리
+      const isUniqueViolation =
+        error instanceof Error &&
+        (error.message.includes("unique") || error.message.includes("23505"));
+
+      if (!isUniqueViolation) throw error;
+
       const [existing] = await db
         .select()
         .from(storyboardVersions)
@@ -63,7 +75,9 @@ export class VersionsService {
           ),
         )
         .limit(1);
-      return existing!;
+
+      if (!existing) throw error;
+      return existing;
     }
   }
 
@@ -86,11 +100,10 @@ export class VersionsService {
       0,
       autoVersions.length - MAX_AUTO_VERSIONS,
     );
-    for (const v of toDelete) {
-      await db
-        .delete(storyboardVersions)
-        .where(eq(storyboardVersions.id, v.id));
-    }
+    const idsToDelete = toDelete.map((v) => v.id);
+    await db
+      .delete(storyboardVersions)
+      .where(inArray(storyboardVersions.id, idsToDelete));
   }
 
   /** 버전 목록 (content 제외) */
@@ -163,7 +176,7 @@ export class VersionsService {
       await tx
         .update(storyboards)
         .set({
-          content: version.content as never,
+          content: version.content as Record<string, unknown>,
           contentVersion: newVersion,
           updatedAt: new Date(),
         })
@@ -175,14 +188,21 @@ export class VersionsService {
           storyboardId,
           createdBy: restoredBy,
           label: null,
-          content: version.content as never,
+          content: version.content as Record<string, unknown>,
           contentVersion: newVersion,
           restoredFromId: versionId,
-          metadata: { added: 0, removed: 0, modified: 0 },
+          metadata: this.calcMetadata(
+            version.content as Record<string, unknown>,
+          ),
         })
         .returning();
 
-      return { snapshot: snapshot!, contentVersion: newVersion };
+      if (!snapshot) {
+        throw new UnprocessableEntityException(
+          "Failed to create restore snapshot",
+        );
+      }
+      return { snapshot, contentVersion: newVersion };
     });
   }
 
