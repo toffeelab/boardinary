@@ -17,7 +17,11 @@ import { NodeEventDto } from "./dto/node-event.dto";
 import { EdgeEventDto } from "./dto/edge-event.dto";
 import { PresenceEventDto } from "./dto/presence-event.dto";
 import { ReplayEventDto } from "./dto/replay-event.dto";
-import type { UserPresence, Operation } from "@repo/types";
+import type {
+  UserPresence,
+  Operation,
+  VersionRestoredEvent,
+} from "@repo/types";
 
 @WebSocketGateway({
   cors: {
@@ -303,6 +307,15 @@ export class CollaborationGateway implements OnGatewayDisconnect {
 
     this.socketRoom.delete(client.id);
     client.to(storyboardId).emit("room:user-left", { userId, name });
+  }
+
+  @OnEvent("version.restored")
+  handleVersionRestored(payload: VersionRestoredEvent) {
+    this.server.to(payload.storyboardId).emit("room:restored", {
+      content: payload.content,
+      contentVersion: payload.contentVersion,
+      restoredBy: payload.restoredBy,
+    });
   }
 
   @OnEvent("app.shutdown")
