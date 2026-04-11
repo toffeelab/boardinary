@@ -5,6 +5,7 @@ import { AuthModule } from "./auth/auth.module";
 import { BlueprintsModule } from "./blueprints/blueprints.module";
 import { CollaborationModule } from "./collaboration/collaboration.module";
 import { VersionsModule } from "./versions/versions.module";
+import { CommentsModule } from "./comments/comments.module";
 import { HealthController } from "./health.controller";
 import { OrganizationsModule } from "./organizations/organizations.module";
 import { ProjectsModule } from "./projects/projects.module";
@@ -26,6 +27,7 @@ import { UsersModule } from "./users/users.module";
     BlueprintsModule,
     CollaborationModule,
     VersionsModule,
+    CommentsModule,
   ],
   controllers: [HealthController],
 })

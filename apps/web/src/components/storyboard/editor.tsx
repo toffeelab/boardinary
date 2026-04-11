@@ -49,6 +49,10 @@ import { editBlueprint } from "@/actions/blueprint-actions";
 import { useVersions } from "./versions/useVersions";
 import { VersionPanel } from "./versions/VersionPanel";
 import { VersionPreviewModal } from "./versions/VersionPreviewModal";
+import { useComments } from "./comments/useComments";
+import { CommentOverlay } from "./comments/CommentOverlay";
+import { CommentPanel } from "./comments/CommentPanel";
+import { CommentInput } from "./comments/CommentInput";
 
 interface StoryboardEditorBaseProps {
   initialContent: Record<string, unknown>;
@@ -233,6 +237,10 @@ function EditorInner(props: StoryboardEditorProps) {
     setActiveSidePanel,
     previewVersionId,
     setPreviewVersionId,
+    isCommentMode,
+    activeCommentId,
+    setCommentMode,
+    setActiveCommentId,
   } = useEditorStore();
 
   // Initialize content version
@@ -256,6 +264,9 @@ function EditorInner(props: StoryboardEditorProps) {
   const [conflictNodeIds, setConflictNodeIds] = useState<Set<string>>(
     new Set(),
   );
+
+  // 해결된 주석 표시 여부
+  const [showResolved, setShowResolved] = useState(false);
 
   // Hooks — auto-save differs based on mode
   const storyboardAutoSave = useAutoSave({
@@ -331,6 +342,22 @@ function EditorInner(props: StoryboardEditorProps) {
       setEdges((eds) => eds.filter((e) => e.id !== edgeId));
     },
   });
+
+  // useComments — 주석 시스템
+  const {
+    comments,
+    addComment,
+    deleteComment,
+    updateCommentStatus,
+    addReply,
+    updateReply,
+    deleteReply,
+  } = useComments({
+    storyboardId: storyboardId ?? "",
+    socket: socketRef?.current ?? null,
+  });
+
+  const effectiveComments = isBlueprint ? [] : comments;
 
   // Mark dirty and trigger debounced save
   const markDirtyAndSave = useCallback(
@@ -803,6 +830,9 @@ function EditorInner(props: StoryboardEditorProps) {
     onUngroup: handleUngroupNodes,
     onSaveAsBlueprint: handleSaveAsBlueprint,
     toggleHistory: !isBlueprint ? handleToggleHistory : undefined,
+    onToggleCommentMode: () => setCommentMode(!isCommentMode),
+    onExitCommentMode: () => setCommentMode(false),
+    isCommentMode,
   });
 
   // collab 커스텀 이벤트 구독
@@ -868,6 +898,29 @@ function EditorInner(props: StoryboardEditorProps) {
       updatePresence(flowPos, selectedIds);
     },
     [reactFlowInstance, updatePresence],
+  );
+
+  // 주석 모드 — 빈 캔버스 클릭 시 좌표 기반 주석 생성을 위한 pending 상태
+  const [pendingAnchor, setPendingAnchor] = useState<{
+    anchorType: "canvas";
+    canvasX: number;
+    canvasY: number;
+  } | null>(null);
+
+  const handlePaneClickForComment = useCallback(
+    (event: React.MouseEvent) => {
+      if (!isCommentMode || !reactFlowInstance) return;
+      const pos = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      setPendingAnchor({
+        anchorType: "canvas",
+        canvasX: pos.x,
+        canvasY: pos.y,
+      });
+    },
+    [isCommentMode, reactFlowInstance],
   );
 
   // Template browser state
@@ -1242,8 +1295,19 @@ function EditorInner(props: StoryboardEditorProps) {
                   onMoveEnd={handleMoveEnd}
                   onNodeDrop={handleNodeDrop}
                   nodeClassName={nodeClassName}
-                />
-                <PresenceLayer />
+                  isCommentMode={isCommentMode}
+                  onPaneClick={
+                    isCommentMode ? handlePaneClickForComment : undefined
+                  }
+                >
+                  <PresenceLayer />
+                  <CommentOverlay
+                    comments={effectiveComments}
+                    activeCommentId={activeCommentId}
+                    onPinClick={(id) => setActiveCommentId(id)}
+                    showResolved={showResolved}
+                  />
+                </Canvas>
                 {contextMenu && (
                   <ContextMenu
                     x={contextMenu.x}
@@ -1257,6 +1321,45 @@ function EditorInner(props: StoryboardEditorProps) {
                   />
                 )}
               </div>
+              {activeCommentId && !isBlueprint && (
+                <CommentPanel
+                  comments={effectiveComments}
+                  activeCommentId={activeCommentId}
+                  currentUserId={userId ?? ""}
+                  showResolved={showResolved}
+                  onToggleResolved={() => setShowResolved((prev) => !prev)}
+                  onClose={() => setActiveCommentId(null)}
+                  onDelete={async (id) => {
+                    await deleteComment(id);
+                    setActiveCommentId(null);
+                  }}
+                  onStatusChange={async (id, status) => {
+                    await updateCommentStatus(id, { status });
+                  }}
+                  onAddReply={async (commentId, content) => {
+                    await addReply(commentId, { content });
+                  }}
+                  onUpdateReply={async (replyId, content) => {
+                    await updateReply(replyId, { content });
+                  }}
+                  onDeleteReply={async (replyId) => {
+                    await deleteReply(replyId);
+                  }}
+                />
+              )}
+              {pendingAnchor && !isBlueprint && (
+                <div className="absolute left-1/2 top-1/2 z-50 w-72 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-4 shadow-xl">
+                  <p className="mb-2 text-sm font-medium">주석 추가</p>
+                  <CommentInput
+                    autoFocus
+                    onSubmit={async (content) => {
+                      await addComment({ ...pendingAnchor, content });
+                      setPendingAnchor(null);
+                    }}
+                    onCancel={() => setPendingAnchor(null)}
+                  />
+                </div>
+              )}
               {rightCollapsed && (
                 <button
                   type="button"
@@ -1306,6 +1409,10 @@ function EditorInner(props: StoryboardEditorProps) {
         onAddNode={handleAddNode}
         onOpenTemplates={() => setIsTemplateBrowserOpen(true)}
         onToggleHistory={!isBlueprint ? handleToggleHistory : undefined}
+        isCommentMode={isCommentMode}
+        onToggleCommentMode={
+          isBlueprint ? undefined : () => setCommentMode(!isCommentMode)
+        }
       />
 
       {/* Template browser modal */}

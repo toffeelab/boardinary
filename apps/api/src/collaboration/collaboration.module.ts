@@ -8,12 +8,14 @@ import { CollaborationRedisService } from "./collaboration-redis.service";
 import { WsAuthGuard } from "./guards/ws-auth.guard";
 import { StoryboardsModule } from "../storyboards/storyboards.module";
 import { VersionsModule } from "../versions/versions.module";
+import { CommentsModule } from "../comments/comments.module";
 
 @Module({
   imports: [
     ConfigModule,
     StoryboardsModule,
     forwardRef(() => VersionsModule),
+    CommentsModule,
     ScheduleModule.forRoot(),
   ],
   providers: [

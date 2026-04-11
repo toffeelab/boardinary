@@ -17,6 +17,10 @@ interface EditorState {
   saveStatus: "idle" | "saving" | "saved" | "error" | "conflict";
   contentVersion: number;
 
+  // 주석 모드
+  isCommentMode: boolean;
+  activeCommentId: string | null;
+
   // 레이아웃 (persist)
   layoutPreset: LayoutPreset;
   leftPanelTab: "elements" | "blueprints";
@@ -40,6 +44,10 @@ interface EditorState {
   setActiveSidePanel: (panel: "comments" | "versions" | null) => void;
   setPreviewVersionId: (id: string | null) => void;
 
+  // 주석 모드 액션
+  setCommentMode: (active: boolean) => void;
+  setActiveCommentId: (id: string | null) => void;
+
   // Undo/Redo 액션
   pushHistory: (entry: HistoryEntry) => void;
   undo: () => HistoryEntry | null;
@@ -57,6 +65,9 @@ export const useEditorStore = create<EditorState>()(
       selectedNodeId: null,
       saveStatus: "idle",
       contentVersion: 0,
+
+      isCommentMode: false,
+      activeCommentId: null,
 
       layoutPreset: "default" as LayoutPreset,
       leftPanelTab: "elements" as const,
@@ -77,6 +88,13 @@ export const useEditorStore = create<EditorState>()(
       setLeftPanelTab: (tab) => set({ leftPanelTab: tab }),
       setActiveSidePanel: (panel) => set({ activeSidePanel: panel }),
       setPreviewVersionId: (id) => set({ previewVersionId: id }),
+
+      setCommentMode: (active) =>
+        set({
+          isCommentMode: active,
+          ...(active ? {} : { activeCommentId: null }),
+        }),
+      setActiveCommentId: (id) => set({ activeCommentId: id }),
 
       pushHistory: (entry) =>
         set((s) => ({

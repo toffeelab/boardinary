@@ -1,6 +1,6 @@
 {
-  "id": "77234552-a0dc-4875-ad31-0da86e7f6244",
-  "prevId": "e8c1c8ba-890c-40ee-8331-33be5ad5a82c",
+  "id": "e8c1c8ba-890c-40ee-8331-33be5ad5a82c",
+  "prevId": "d0dc547d-b0dd-4545-ab30-9dd2cbf66736",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1036,28 +1036,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_sv_auto_retention": {
-          "name": "idx_sv_auto_retention",
-          "columns": [
-            {
-              "expression": "storyboard_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"label\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

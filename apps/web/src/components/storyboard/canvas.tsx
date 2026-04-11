@@ -37,6 +37,9 @@ interface CanvasProps {
     position: { x: number; y: number },
   ) => void;
   nodeClassName?: (node: Node) => string;
+  onPaneClick?: (event: React.MouseEvent) => void;
+  isCommentMode?: boolean;
+  children?: React.ReactNode;
 }
 
 export function Canvas({
@@ -50,6 +53,9 @@ export function Canvas({
   onMoveEnd,
   onNodeDrop,
   nodeClassName,
+  onPaneClick,
+  isCommentMode = false,
+  children,
 }: CanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const { isValidConnection } = useEdgeValidation(edges);
@@ -113,6 +119,10 @@ export function Canvas({
         fitView
         deleteKeyCode="Delete"
         multiSelectionKeyCode="Shift"
+        onPaneClick={onPaneClick}
+        nodesDraggable={!isCommentMode}
+        nodesConnectable={!isCommentMode}
+        elementsSelectable={!isCommentMode}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <MiniMap
@@ -124,6 +134,7 @@ export function Canvas({
           }}
         />
         <Controls />
+        {children}
       </ReactFlow>
     </div>
   );
