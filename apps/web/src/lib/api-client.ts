@@ -4,6 +4,8 @@ import type {
   BlueprintMetaDto,
   CreateBlueprintDto,
   UpdateBlueprintDto,
+  VersionDto,
+  VersionWithContentDto,
 } from "@repo/types";
 
 const API_URL = process.env.API_URL ?? "http://localhost:4001";
@@ -109,4 +111,63 @@ export async function deleteBlueprint(userId: string, id: string) {
     method: "DELETE",
     userId,
   });
+}
+
+// Version History
+
+export async function listVersions(userId: string, storyboardId: string) {
+  return apiClient<VersionDto[]>(`/api/storyboards/${storyboardId}/versions`, {
+    userId,
+  });
+}
+
+export async function getVersionById(
+  userId: string,
+  storyboardId: string,
+  versionId: string,
+) {
+  return apiClient<VersionWithContentDto>(
+    `/api/storyboards/${storyboardId}/versions/${versionId}`,
+    { userId },
+  );
+}
+
+export async function createCheckpoint(
+  userId: string,
+  storyboardId: string,
+  label: string,
+) {
+  return apiClient<VersionDto>(`/api/storyboards/${storyboardId}/versions`, {
+    method: "POST",
+    body: { label },
+    userId,
+  });
+}
+
+export async function restoreVersion(
+  userId: string,
+  storyboardId: string,
+  versionId: string,
+) {
+  return apiClient<VersionDto>(
+    `/api/storyboards/${storyboardId}/versions/${versionId}/restore`,
+    {
+      method: "POST",
+      userId,
+    },
+  );
+}
+
+export async function deleteVersion(
+  userId: string,
+  storyboardId: string,
+  versionId: string,
+) {
+  return apiClient<void>(
+    `/api/storyboards/${storyboardId}/versions/${versionId}`,
+    {
+      method: "DELETE",
+      userId,
+    },
+  );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, MessageSquare } from "lucide-react";
+import { ClipboardList, History, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type StoryboardNodeType =
@@ -14,6 +14,7 @@ type StoryboardNodeType =
 interface ToolbarProps {
   onAddNode: (type: StoryboardNodeType) => void;
   onOpenTemplates?: () => void;
+  onToggleHistory?: () => void;
   isCommentMode?: boolean;
   onToggleCommentMode?: () => void;
 }
@@ -34,6 +35,7 @@ const ADD_BUTTONS: {
 export function Toolbar({
   onAddNode,
   onOpenTemplates,
+  onToggleHistory,
   isCommentMode,
   onToggleCommentMode,
 }: ToolbarProps) {
@@ -75,6 +77,23 @@ export function Toolbar({
           >
             <ClipboardList className="h-4 w-4" />
             템플릿
+          </Button>
+        </>
+      )}
+
+      {onToggleHistory && (
+        <>
+          <div className="mx-2 h-5 w-px bg-border" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onToggleHistory}
+            title="버전 히스토리 (H)"
+            className="gap-1.5"
+          >
+            <History className="h-4 w-4" />
+            히스토리
           </Button>
         </>
       )}

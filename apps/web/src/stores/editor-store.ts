@@ -29,6 +29,10 @@ interface EditorState {
   undoStack: HistoryEntry[];
   redoStack: HistoryEntry[];
 
+  // 사이드 패널
+  activeSidePanel: "comments" | "versions" | null;
+  previewVersionId: string | null;
+
   // 액션
   toggleNodeList: () => void;
   togglePropertyPanel: () => void;
@@ -37,6 +41,8 @@ interface EditorState {
   setContentVersion: (version: number) => void;
   setLayoutPreset: (preset: LayoutPreset) => void;
   setLeftPanelTab: (tab: "elements" | "blueprints") => void;
+  setActiveSidePanel: (panel: "comments" | "versions" | null) => void;
+  setPreviewVersionId: (id: string | null) => void;
 
   // 주석 모드 액션
   setCommentMode: (active: boolean) => void;
@@ -66,6 +72,9 @@ export const useEditorStore = create<EditorState>()(
       layoutPreset: "default" as LayoutPreset,
       leftPanelTab: "elements" as const,
 
+      activeSidePanel: null,
+      previewVersionId: null,
+
       undoStack: [],
       redoStack: [],
 
@@ -77,6 +86,8 @@ export const useEditorStore = create<EditorState>()(
       setContentVersion: (version) => set({ contentVersion: version }),
       setLayoutPreset: (preset) => set({ layoutPreset: preset }),
       setLeftPanelTab: (tab) => set({ leftPanelTab: tab }),
+      setActiveSidePanel: (panel) => set({ activeSidePanel: panel }),
+      setPreviewVersionId: (id) => set({ previewVersionId: id }),
 
       setCommentMode: (active) =>
         set({

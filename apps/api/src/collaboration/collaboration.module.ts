@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import Redis from "ioredis";
@@ -7,12 +7,14 @@ import { CollaborationService } from "./collaboration.service";
 import { CollaborationRedisService } from "./collaboration-redis.service";
 import { WsAuthGuard } from "./guards/ws-auth.guard";
 import { StoryboardsModule } from "../storyboards/storyboards.module";
+import { VersionsModule } from "../versions/versions.module";
 import { CommentsModule } from "../comments/comments.module";
 
 @Module({
   imports: [
     ConfigModule,
     StoryboardsModule,
+    forwardRef(() => VersionsModule),
     CommentsModule,
     ScheduleModule.forRoot(),
   ],
@@ -32,5 +34,6 @@ import { CommentsModule } from "../comments/comments.module";
     CollaborationGateway,
     WsAuthGuard,
   ],
+  exports: [CollaborationService],
 })
 export class CollaborationModule {}

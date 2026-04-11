@@ -46,6 +46,9 @@ import type { StoryboardTemplate } from "./templates";
 import { extractBlueprintContent } from "@/lib/blueprint-utils";
 import { renameStoryboard } from "@/actions/storyboard-actions";
 import { editBlueprint } from "@/actions/blueprint-actions";
+import { useVersions } from "./versions/useVersions";
+import { VersionPanel } from "./versions/VersionPanel";
+import { VersionPreviewModal } from "./versions/VersionPreviewModal";
 import { useComments } from "./comments/useComments";
 import { CommentOverlay } from "./comments/CommentOverlay";
 import { CommentPanel } from "./comments/CommentPanel";
@@ -230,6 +233,10 @@ function EditorInner(props: StoryboardEditorProps) {
     selectedNodeId,
     setSelectedNodeId,
     setContentVersion,
+    activeSidePanel,
+    setActiveSidePanel,
+    previewVersionId,
+    setPreviewVersionId,
     isCommentMode,
     activeCommentId,
     setCommentMode,
@@ -763,6 +770,56 @@ function EditorInner(props: StoryboardEditorProps) {
     setIsSaveBlueprintOpen(true);
   }, []);
 
+  // Version history — room:restored handler
+  const handleRestored = useCallback(
+    (payload: {
+      content: Record<string, unknown>;
+      contentVersion: number;
+      restoredBy: string;
+    }) => {
+      const migrated = migrateContent(payload.content) as StoryboardContentV1;
+      const newNodes: Node[] = migrated.nodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        position: n.position,
+        data: n.data as unknown as Record<string, unknown>,
+      }));
+      const newEdges: Edge[] = migrated.edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
+        ...(e.label ? { label: e.label } : {}),
+      }));
+      isRemoteUpdateRef.current = true;
+      setNodes(newNodes);
+      setEdges(newEdges);
+      nodesRef.current = newNodes;
+      edgesRef.current = newEdges;
+      isRemoteUpdateRef.current = false;
+    },
+    [setNodes, setEdges],
+  );
+
+  // useVersions — storyboard 모드 전용
+  const {
+    versions,
+    isLoading: versionsLoading,
+    saveCheckpoint,
+    restore,
+    deleteVersion,
+  } = useVersions({
+    storyboardId: !isBlueprint ? storyboardId : "",
+    userId: !isBlueprint ? userId : "",
+    socket: !isBlueprint ? socketRef.current : null,
+    onRestored: handleRestored,
+  });
+
+  // toggleHistory helper
+  const handleToggleHistory = useCallback(() => {
+    setActiveSidePanel(activeSidePanel === "versions" ? null : "versions");
+  }, [activeSidePanel, setActiveSidePanel]);
+
   // Wire keyboard shortcuts
   useEditorShortcuts({
     onSave: handleShortcutSave,
@@ -772,6 +829,7 @@ function EditorInner(props: StoryboardEditorProps) {
     onGroup: handleGroupNodes,
     onUngroup: handleUngroupNodes,
     onSaveAsBlueprint: handleSaveAsBlueprint,
+    toggleHistory: !isBlueprint ? handleToggleHistory : undefined,
     onToggleCommentMode: () => setCommentMode(!isCommentMode),
     onExitCommentMode: () => setCommentMode(false),
     isCommentMode,
@@ -1328,6 +1386,20 @@ function EditorInner(props: StoryboardEditorProps) {
                 {rightPanel}
               </aside>
             )}
+
+            {/* Version history panel */}
+            {!isBlueprint && activeSidePanel === "versions" && (
+              <aside className="shrink-0 overflow-hidden">
+                <VersionPanel
+                  versions={versions}
+                  isLoading={versionsLoading}
+                  onSelectVersion={(id) => setPreviewVersionId(id)}
+                  onRestore={restore}
+                  onDelete={deleteVersion}
+                  onSaveCheckpoint={saveCheckpoint}
+                />
+              </aside>
+            )}
           </div>
         );
       })()}
@@ -1336,6 +1408,7 @@ function EditorInner(props: StoryboardEditorProps) {
       <Toolbar
         onAddNode={handleAddNode}
         onOpenTemplates={() => setIsTemplateBrowserOpen(true)}
+        onToggleHistory={!isBlueprint ? handleToggleHistory : undefined}
         isCommentMode={isCommentMode}
         onToggleCommentMode={
           isBlueprint ? undefined : () => setCommentMode(!isCommentMode)
@@ -1357,6 +1430,17 @@ function EditorInner(props: StoryboardEditorProps) {
         onOpenChange={setIsSaveBlueprintOpen}
         content={saveBlueprintContent}
       />
+
+      {/* Version preview modal */}
+      {!isBlueprint && (
+        <VersionPreviewModal
+          versionId={previewVersionId}
+          storyboardId={storyboardId}
+          userId={userId}
+          onClose={() => setPreviewVersionId(null)}
+          onRestore={restore}
+        />
+      )}
     </div>
   );
 }

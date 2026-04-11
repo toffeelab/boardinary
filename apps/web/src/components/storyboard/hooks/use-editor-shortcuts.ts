@@ -10,6 +10,7 @@ interface UseEditorShortcutsOptions {
   onGroup?: () => void;
   onUngroup?: () => void;
   onSaveAsBlueprint?: () => void;
+  toggleHistory?: () => void;
   onToggleCommentMode?: () => void;
   onExitCommentMode?: () => void;
   isCommentMode?: boolean;
@@ -23,12 +24,30 @@ export function useEditorShortcuts({
   onGroup,
   onUngroup,
   onSaveAsBlueprint,
+  toggleHistory,
   onToggleCommentMode,
   onExitCommentMode,
   isCommentMode,
 }: UseEditorShortcutsOptions) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Block shortcuts when typing in an input/textarea/contenteditable
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      // H key — toggle version history panel (no modifier)
+      if ((e.key === "h" || e.key === "H") && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        toggleHistory?.();
+        return;
+      }
+
       const mod = e.metaKey || e.ctrlKey;
 
       // C 키: 주석 모드 토글 (Ctrl/Cmd 없이)
@@ -102,6 +121,7 @@ export function useEditorShortcuts({
     onGroup,
     onUngroup,
     onSaveAsBlueprint,
+    toggleHistory,
     onToggleCommentMode,
     onExitCommentMode,
     isCommentMode,

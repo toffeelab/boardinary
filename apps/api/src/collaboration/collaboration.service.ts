@@ -1,7 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Inject, forwardRef } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { CollaborationRedisService } from "./collaboration-redis.service";
 import { StoryboardsService } from "../storyboards/storyboards.service";
+import { VersionsService } from "../versions/versions.service";
 import type { RoomStatePayload, UserPresence } from "@repo/types";
 
 const PRESENCE_COLORS = [
@@ -22,6 +23,8 @@ export class CollaborationService {
   constructor(
     private readonly redis: CollaborationRedisService,
     private readonly storyboardsService: StoryboardsService,
+    @Inject(forwardRef(() => VersionsService))
+    private readonly versionsService: VersionsService,
   ) {}
 
   /** 룸 입장 시 색상 배정 */
@@ -83,14 +86,18 @@ export class CollaborationService {
   }
 
   /** 초기 룸 진입 시 DB에서 Redis로 상태 로드 */
-  async initRoomFromDb(storyboardId: string): Promise<number> {
+  async initRoomFromDb(
+    storyboardId: string,
+    forceReload = false,
+  ): Promise<number> {
     const storyboard =
       await this.storyboardsService.getStoryboardById(storyboardId);
     const dbVersion = storyboard.contentVersion;
     const redisVersion = await this.redis.getVersion(storyboardId);
 
-    // Redis가 DB와 동기화된 상태면 그대로 사용
-    if (redisVersion > 0 && redisVersion >= dbVersion) return redisVersion;
+    // forceReload=true면 항상 재로드 (복원 후 필수), 아니면 Redis가 동기화된 상태면 그대로 사용
+    if (!forceReload && redisVersion > 0 && redisVersion >= dbVersion)
+      return redisVersion;
 
     // Redis가 낡았거나 비어있으면 DB에서 재로드
     await this.redis.clearRoom(storyboardId);
@@ -188,6 +195,22 @@ export class CollaborationService {
     });
 
     await this.redis.clearDirty(storyboardId);
+
+    // 10번째 버전마다 자동 스냅샷 생성
+    if (version > 0 && version % 10 === 0) {
+      try {
+        await this.versionsService.createSnapshot(
+          storyboardId,
+          content as Record<string, unknown>,
+          version - 1,
+          null,
+          "system",
+        );
+        await this.versionsService.pruneAutoVersions(storyboardId);
+      } catch {
+        // 스냅샷 실패가 flush를 막으면 안 됨
+      }
+    }
   }
 
   async flushAllDirtyRooms(): Promise<void> {

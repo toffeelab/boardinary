@@ -188,6 +188,8 @@ export class CommentsService {
       .where(eq(comments.id, commentId))
       .limit(1);
     if (!comment) throw new NotFoundException("Comment not found");
+    if (comment.authorId !== userId)
+      throw new ForbiddenException("Not authorized");
 
     const updateData =
       dto.status === "resolved"

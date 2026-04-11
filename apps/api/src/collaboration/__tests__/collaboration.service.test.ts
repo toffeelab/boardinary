@@ -40,6 +40,11 @@ const mockStoryboardsService = {
   updateStoryboard: vi.fn().mockResolvedValue(undefined),
 };
 
+const mockVersionsService = {
+  createSnapshot: vi.fn().mockResolvedValue(undefined),
+  pruneAutoVersions: vi.fn().mockResolvedValue(undefined),
+};
+
 vi.mock("@repo/db", () => ({}));
 
 describe("CollaborationService", () => {
@@ -50,6 +55,7 @@ describe("CollaborationService", () => {
     service = new CollaborationService(
       mockRedis as unknown as CollaborationRedisService,
       mockStoryboardsService as never,
+      mockVersionsService as never,
     );
   });
 
